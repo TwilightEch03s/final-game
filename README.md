@@ -14,9 +14,11 @@
 4. **Generative AI** - We plan on using chatGPT and microsoft copilot to write more readable code.  We would use it to identify code smells and help make debugging easier.  We will not be using these tools for creating ideas and plans for the project.
 
 ## Outlook
-**What is your team hoping to accomplish that other teams might not attempt?**
-- We hope to create our own assets for our game instead of just finding online assets to use.
-**What do you anticipate being the hardest or riskiest part of the project?**
+**What is your team hoping to accomplish that other teams might not attempt?**  
+- We hope to create our own assets for our game instead of just finding online assets to use.  
+
+**What do you anticipate being the hardest or riskiest part of the project?**  
 - We anticipate that the hardest part of the project is implementing the 3D objects and physics into the game as well as the initial setup. We don’t really have much experience using outside libraries for 3D projects aside from engines designed for 3D experiences (Unity, Godot). Furthermore, a lot of our experience so far in programming has been done with pre-built starter code which made it easier to get started with projects.  
-**What are you hoping to learn by approaching the project with the tools and materials you selected above?**
-- We hope to learn how to create a physics engine from “scratch” and to use outside libraries in programming projects.
+
+**What are you hoping to learn by approaching the project with the tools and materials you selected above?**  
+- We hope to learn how to create a physics engine from “scratch” and to use outside libraries in programming projects.  
