@@ -41,6 +41,8 @@
     ".git"
   ],
   "imports": {
-    "vite": "npm:vite@7"
+    "three": "npm:three@^0.181.2",
+    "vite": "npm:vite@7",
+    "ammo.js": "npm:ammo.js"
   }
 }
