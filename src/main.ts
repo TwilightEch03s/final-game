@@ -28,6 +28,21 @@ let tmpTrans: any;
 // Constants
 const GRAVITY = -9.82;
 
+// Player / power UI state
+// deno-lint-ignore no-explicit-any
+let playerRigidBody: any = null;
+let _playerMesh: THREE.Mesh | null = null;
+
+const POWER_MAX = 100;
+const POWER_RATE = 40; // units per second
+const OVERPOWER_THRESHOLD = 85; // above this causes left/right random offset
+let power = 0;
+let isCharging = false;
+let overcharged = false;
+
+// DOM elements we'll create
+let powerFillEl: HTMLElement | null = null;
+
 function start() {
   console.log("Start function called");
   initScene();
@@ -36,6 +51,8 @@ function start() {
   console.log("Physics initialized");
   createBodies();
   console.log("Bodies created");
+  // Attach input handlers and create UI
+  addInputListeners();
   animate();
   console.log("Animation started");
 }
@@ -108,25 +125,49 @@ function initPhysics() {
 }
 
 function createBodies() {
-  // Ground plane
-  const groundShape = new Ammo.btBoxShape(new Ammo.btVector3(25, 1, 25));
+  // Ground (physics uses a box so it's finite; visual is an actual plane)
+  const groundHalfX = 20;
+  const groundHalfZ = 20;
+  const groundY = 1;
+
+  const groundShape = new Ammo.btBoxShape(
+    new Ammo.btVector3(groundHalfX, 1, groundHalfZ),
+  );
+
   const groundBody = createRigidBody(groundShape, 0, {
     x: 0,
-    y: -5,
+    y: groundY - 1,
     z: 0,
   });
-  scene.add(groundBody.mesh);
 
-  // Add some falling boxes
-  for (let i = 0; i < 5; i++) {
-    const boxShape = new Ammo.btBoxShape(new Ammo.btVector3(1, 1, 1));
-    const boxBody = createRigidBody(boxShape, 1, {
-      x: Math.random() * 10 - 5,
-      y: 5 + i * 3,
-      z: Math.random() * 10 - 5,
-    });
-    scene.add(boxBody.mesh);
-  }
+  // remove the auto-created box mesh and replace with a flat plane visual
+  scene.remove(groundBody.mesh);
+  const planeGeometry = new THREE.PlaneGeometry(
+    groundHalfX * 2,
+    groundHalfZ * 2,
+  );
+  const planeMaterial = new THREE.MeshStandardMaterial({
+    color: 0x3a3a3a,
+    side: THREE.DoubleSide,
+  });
+  const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+  planeMesh.rotation.x = -Math.PI / 2;
+  planeMesh.position.y = groundY;
+  planeMesh.receiveShadow = true;
+  scene.add(planeMesh);
+
+  // Single grey box (player)
+  const boxShape = new Ammo.btBoxShape(new Ammo.btVector3(1, 1, 1));
+  const boxBody = createRigidBody(boxShape, 1, { x: 0, y: 2, z: 6 });
+
+  // Override the color to grey
+  (boxBody.mesh.material as THREE.MeshStandardMaterial).color.set(0x888888);
+
+  scene.add(boxBody.mesh);
+
+  // Register this as the player object so input can apply impulses
+  playerRigidBody = boxBody.rigidBody;
+  _playerMesh = boxBody.mesh;
 }
 
 function createSimpleBodies() {
@@ -187,19 +228,33 @@ function createRigidBody(
   let geometry: THREE.BufferGeometry;
   let material: THREE.Material;
 
-  if (shape instanceof Ammo.btBoxShape) {
-    geometry = new THREE.BoxGeometry(2, 2, 2);
-    material = new THREE.MeshStandardMaterial({
-      color: Math.random() * 0xffffff,
-      roughness: 0.7,
-    });
-  } else if (shape instanceof Ammo.btSphereShape) {
-    geometry = new THREE.SphereGeometry(1, 32, 32);
-    material = new THREE.MeshStandardMaterial({
-      color: Math.random() * 0xffffff,
-      roughness: 0.7,
-    });
-  } else {
+  // If the shape is a box, try to read its half-extents so the visual
+  // mesh matches the physics shape. This prevents tiny visual planes while
+  // physics uses a large collision box.
+  try {
+    if (shape instanceof Ammo.btBoxShape) {
+      // btBoxShape stores half extents; use them to build the Three mesh
+      const halfExt = shape.getHalfExtentsWithMargin();
+      const hx = halfExt.x ? halfExt.x() : 1;
+      const hy = halfExt.y ? halfExt.y() : 1;
+      const hz = halfExt.z ? halfExt.z() : 1;
+      geometry = new THREE.BoxGeometry(hx * 2, hy * 2, hz * 2);
+      material = new THREE.MeshStandardMaterial({
+        color: Math.random() * 0xffffff,
+        roughness: 0.7,
+      });
+    } else if (shape instanceof Ammo.btSphereShape) {
+      geometry = new THREE.SphereGeometry(1, 32, 32);
+      material = new THREE.MeshStandardMaterial({
+        color: Math.random() * 0xffffff,
+        roughness: 0.7,
+      });
+    } else {
+      geometry = new THREE.BoxGeometry(2, 2, 2);
+      material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+    }
+  } catch (_err) {
+    // Fallback if shape introspection fails
     geometry = new THREE.BoxGeometry(2, 2, 2);
     material = new THREE.MeshStandardMaterial({ color: 0x888888 });
   }
@@ -215,13 +270,35 @@ function createRigidBody(
   transform.setOrigin(new Ammo.btVector3(position.x, position.y, position.z));
 
   const motionState = new Ammo.btDefaultMotionState(transform);
+
+  // Calculate local inertia for dynamic bodies
+  const localInertia = new Ammo.btVector3(0, 0, 0);
+  if (mass > 0) {
+    try {
+      shape.calculateLocalInertia(mass, localInertia);
+    } catch (_e) {
+      // ignore if shape doesn't support it
+    }
+  }
+
   const rbInfo = new Ammo.btRigidBodyConstructionInfo(
     mass,
     motionState,
     shape,
-    new Ammo.btVector3(0, 0, 0),
+    localInertia,
   );
   const rigidBody = new Ammo.btRigidBody(rbInfo);
+
+  // Make dynamic bodies active and set some reasonable friction/restitution
+  if (mass > 0) {
+    try {
+      rigidBody.setFriction(0.6);
+      rigidBody.setRestitution(0.05);
+      if (rigidBody.activate) rigidBody.activate();
+    } catch (_e) {
+      // ignore
+    }
+  }
 
   // Add to physics world
   physicsWorld.addRigidBody(rigidBody);
@@ -236,9 +313,11 @@ function createRigidBody(
 function animate() {
   requestAnimationFrame(animate);
 
+  // Always advance the clock and get delta time
+  const deltaTime = clock.getDelta();
+
   // Update physics only if physicsWorld exists
   if (physicsWorld) {
-    const deltaTime = clock.getDelta();
     physicsWorld.stepSimulation(deltaTime, 10);
 
     // Update rigid body meshes
@@ -258,8 +337,36 @@ function animate() {
         );
       }
     });
-  } else {
-    clock.getDelta(); // Still advance the clock
+  }
+
+  // If player is charging, accumulate power and optionally nudge the ball forward
+  if (isCharging) {
+    power += POWER_RATE * deltaTime;
+    if (power > POWER_MAX) power = POWER_MAX;
+    overcharged = power >= OVERPOWER_THRESHOLD;
+    updatePowerUI();
+  }
+
+  // Stabilize small velocities to avoid jitter when object is effectively stopped
+  if (physicsWorld) {
+    rigidBodies.forEach((rigidBody) => {
+      try {
+        const lv = rigidBody.getLinearVelocity();
+        if (lv) {
+          const vx = lv.x();
+          const vy = lv.y();
+          const vz = lv.z();
+          const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+          if (speed < 0.03) {
+            // zero tiny velocities to prevent drifting
+            rigidBody.setLinearVelocity(new Ammo.btVector3(0, 0, 0));
+            rigidBody.setAngularVelocity(new Ammo.btVector3(0, 0, 0));
+          }
+        }
+      } catch (_e) {
+        // ignore bodies that don't support velocities
+      }
+    });
   }
 
   // Update controls
@@ -275,6 +382,102 @@ function onWindowResize() {
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
+}
+
+function createPowerUI() {
+  // container
+  const container = document.createElement("div");
+  container.id = "power-ui";
+
+  const fill = document.createElement("div");
+  fill.id = "power-fill";
+  container.appendChild(fill);
+
+  const label = document.createElement("div");
+  label.id = "power-label";
+  label.textContent = "Power";
+
+  document.body.appendChild(container);
+  document.body.appendChild(label);
+
+  powerFillEl = fill;
+  updatePowerUI();
+}
+
+function updatePowerUI() {
+  if (!powerFillEl) return;
+  const pct = Math.max(0, Math.min(1, power / POWER_MAX));
+  powerFillEl.style.height = `${pct * 100}%`;
+  if (overcharged) powerFillEl.classList.add("power-over");
+  else powerFillEl.classList.remove("power-over");
+}
+
+function startCharging() {
+  if (isCharging) return;
+  isCharging = true;
+  power = 0;
+  overcharged = false;
+  updatePowerUI();
+}
+
+function stopCharging() {
+  if (!isCharging) return;
+  isCharging = false;
+  overcharged = power >= OVERPOWER_THRESHOLD;
+
+  // Apply final impulse based on accumulated power
+  if (playerRigidBody && physicsWorld) {
+    // Use camera forward direction projected on XZ plane so the shot goes
+    // where the camera is looking.
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
+    camDir.y = 0;
+    if (camDir.lengthSq() < 1e-5) camDir.set(0, 0, -1);
+    camDir.normalize();
+
+    const forwardScalar = (power / POWER_MAX) * 60.0;
+
+    // Overcharge: add a random lateral component perpendicular to camera dir
+    let lateralScalar = 0;
+    if (overcharged) {
+      lateralScalar = (Math.random() * 2.0) * (Math.random() < 0.5 ? -1 : 1);
+    }
+
+    const lateralDir = new THREE.Vector3(-camDir.z, 0, camDir.x).normalize();
+
+    const impulseX = camDir.x * forwardScalar + lateralDir.x * lateralScalar;
+    const impulseZ = camDir.z * forwardScalar + lateralDir.z * lateralScalar;
+    const impulseY = 0.15 * (power / POWER_MAX);
+
+    const impulseVec = new Ammo.btVector3(impulseX, impulseY, impulseZ);
+    playerRigidBody.applyCentralImpulse(impulseVec);
+  }
+
+  // Reset power slowly for UI
+  setTimeout(() => {
+    power = 0;
+    overcharged = false;
+    updatePowerUI();
+  }, 120);
+}
+
+function addInputListeners() {
+  // Create UI if not present
+  if (!document.getElementById("power-ui")) createPowerUI();
+
+  globalThis.addEventListener("keydown", (e) => {
+    if ((e as KeyboardEvent).code === "Space") {
+      e.preventDefault();
+      if (!isCharging) startCharging();
+    }
+  });
+
+  globalThis.addEventListener("keyup", (e) => {
+    if ((e as KeyboardEvent).code === "Space") {
+      e.preventDefault();
+      stopCharging();
+    }
+  });
 }
 
 // Start the application
