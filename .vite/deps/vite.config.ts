@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: '/<repo>/', // replace <repo> with your GitHub repo name
-})
+  base: "/<repo>/", // replace <repo> with your GitHub repo name
+});
