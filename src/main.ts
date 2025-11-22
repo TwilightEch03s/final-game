@@ -125,91 +125,86 @@ function initPhysics() {
 }
 
 function createBodies() {
-  // Ground (physics uses a box so it's finite; visual is an actual plane)
-  const groundHalfX = 20;
-  const groundHalfZ = 20;
-  const groundY = 1;
+  // --- Ground with hole ---
+  const groundY = 0;
+  const size = 40; // full ground size
+  const holeSize = 4; // size of the hole
 
-  const groundShape = new Ammo.btBoxShape(
-    new Ammo.btVector3(groundHalfX, 1, groundHalfZ),
-  );
+  // Create THREE shape with hole
+  const shape = new THREE.Shape();
+  shape.moveTo(-size / 2, -size / 2);
+  shape.lineTo(size / 2, -size / 2);
+  shape.lineTo(size / 2, size / 2);
+  shape.lineTo(-size / 2, size / 2);
+  shape.lineTo(-size / 2, -size / 2);
 
-  const groundBody = createRigidBody(groundShape, 0, {
-    x: 0,
-    y: groundY - 1,
-    z: 0,
-  });
+  const hs = holeSize / 2;
 
-  // remove the auto-created box mesh and replace with a flat plane visual
-  scene.remove(groundBody.mesh);
-  const planeGeometry = new THREE.PlaneGeometry(
-    groundHalfX * 2,
-    groundHalfZ * 2,
-  );
-  const planeMaterial = new THREE.MeshStandardMaterial({
-    color: 0x3a3a3a,
-    side: THREE.DoubleSide,
-  });
-  const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
-  planeMesh.rotation.x = -Math.PI / 2;
-  planeMesh.position.y = groundY;
-  planeMesh.receiveShadow = true;
-  scene.add(planeMesh);
+  // define hole position
+  const holeX = 10;  // move 5 units right
+  const holeZ = 10; // move 3 units forward
 
-  // Single grey box (player)
-  const boxShape = new Ammo.btBoxShape(new Ammo.btVector3(1, 1, 1));
-  const boxBody = createRigidBody(boxShape, 1, { x: 0, y: 2, z: 6 });
+  // create a new Path for the hole
+  const holePath = new THREE.Path();
+  holePath.moveTo(-hs + holeX, -hs + holeZ);
+  holePath.lineTo(hs + holeX, -hs + holeZ);
+  holePath.lineTo(hs + holeX, hs + holeZ);
+  holePath.lineTo(-hs + holeX, hs + holeZ);
+  holePath.lineTo(-hs + holeX, -hs + holeZ);
 
-  // Override the color to grey
-  (boxBody.mesh.material as THREE.MeshStandardMaterial).color.set(0x888888);
+  // add the new hole
+  shape.holes.push(holePath);
 
-  scene.add(boxBody.mesh);
 
-  // Register this as the player object so input can apply impulses
-  playerRigidBody = boxBody.rigidBody;
-  _playerMesh = boxBody.mesh;
-}
+  // Extrude geometry for 3D ground
+  const extrudeSettings = { depth: 1, bevelEnabled: false };
+  const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  geometry.rotateX(-Math.PI / 2);
+  geometry.translate(0, groundY, 0);
 
-function createSimpleBodies() {
-  // Ground plane (static)
-  const groundGeometry = new THREE.BoxGeometry(50, 2, 50);
-  const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
-  const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
-  groundMesh.position.y = -5;
-  groundMesh.castShadow = true;
+  const material = new THREE.MeshStandardMaterial({ color: 0x3a3a3a });
+  const groundMesh = new THREE.Mesh(geometry, material);
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
 
-  // Add some boxes
-  for (let i = 0; i < 5; i++) {
-    const geometry = new THREE.BoxGeometry(2, 2, 2);
-    const material = new THREE.MeshStandardMaterial({
-      color: Math.random() * 0xffffff,
-      roughness: 0.7,
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(
-      Math.random() * 10 - 5,
-      5 + i * 3,
-      Math.random() * 10 - 5,
+  // --- Ammo Physics ---
+  const triangleMesh = new Ammo.btTriangleMesh();
+  const vertices = geometry.attributes.position.array;
+  for (let i = 0; i < vertices.length; i += 9) {
+    const v0 = new Ammo.btVector3(
+      vertices[i],
+      vertices[i + 1],
+      vertices[i + 2],
     );
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    scene.add(mesh);
+    const v1 = new Ammo.btVector3(
+      vertices[i + 3],
+      vertices[i + 4],
+      vertices[i + 5],
+    );
+    const v2 = new Ammo.btVector3(
+      vertices[i + 6],
+      vertices[i + 7],
+      vertices[i + 8],
+    );
+    triangleMesh.addTriangle(v0, v1, v2, true);
   }
-}
+  const groundShape = new Ammo.btBvhTriangleMeshShape(triangleMesh, true, true);
+  createRigidBody(groundShape, 0, { x: 0, y: 0, z: 0 });
 
-function startWithoutPhysics() {
-  try {
-    initScene();
-    console.log("Scene initialized without physics");
-    createSimpleBodies();
-    console.log("Simple bodies created");
-    animate();
-    console.log("Animation started (no physics)");
-  } catch (err) {
-    console.error("Failed to initialize scene:", err);
-  }
+  // --- Player ball ---
+  const radius = 1;
+  const sphereShape = new Ammo.btSphereShape(radius);
+  const sphereBody = createRigidBody(sphereShape, 1, { x: 0, y: 2, z: 6 });
+
+  // Color the ball
+  (sphereBody.mesh.material as THREE.MeshStandardMaterial).color.set(0x888888);
+  scene.add(sphereBody.mesh);
+  playerRigidBody = sphereBody.rigidBody;
+  _playerMesh = sphereBody.mesh;
+
+  // Set friction and damping for the ball
+  playerRigidBody.setFriction(1.0);
+  playerRigidBody.setDamping(0.05, 0.92);
 }
 
 interface BodyConfig {
@@ -450,6 +445,11 @@ function stopCharging() {
     const impulseY = 0.15 * (power / POWER_MAX);
 
     const impulseVec = new Ammo.btVector3(impulseX, impulseY, impulseZ);
+
+    // Wake up the body before applying force
+    playerRigidBody.activate(true);
+
+    // Now apply the impulse
     playerRigidBody.applyCentralImpulse(impulseVec);
   }
 
@@ -504,7 +504,6 @@ function waitForAmmo() {
       console.log("Ammo is a function, calling it...");
       AmmoLib().then(start).catch((err: unknown) => {
         console.error("Failed to initialize Ammo:", err);
-        startWithoutPhysics();
       });
     } else {
       // Already initialized
@@ -515,7 +514,6 @@ function waitForAmmo() {
     setTimeout(waitForAmmo, 100);
   } else {
     console.error("Ammo.js failed to load after timeout");
-    startWithoutPhysics();
   }
 }
 
