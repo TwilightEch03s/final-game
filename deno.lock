@@ -2,8 +2,7 @@
   "version": "5",
   "specifiers": {
     "npm:three@~0.181.2": "0.181.2",
-    "npm:vite@*": "7.2.4_picomatch@4.0.3",
-    "npm:vite@7": "7.2.4_picomatch@4.0.3"
+    "npm:vite@^7.2.4": "7.2.4_picomatch@4.0.3"
   },
   "npm": {
     "@esbuild/aix-ppc64@0.25.12": {
@@ -378,7 +377,12 @@
   "workspace": {
     "dependencies": [
       "npm:three@~0.181.2",
-      "npm:vite@7"
-    ]
+      "npm:vite@^7.2.4"
+    ],
+    "packageJson": {
+      "dependencies": [
+        "npm:vite@^7.2.4"
+      ]
+    }
   }
 }

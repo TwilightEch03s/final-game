@@ -1,0 +1,23 @@
+{
+  "name": "bomb-golf",
+  "version": "1.0.0",
+  "description": "## Introducing the Team",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TwilightEch03s/bomb-golf.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TwilightEch03s/bomb-golf/issues"
+  },
+  "homepage": "https://github.com/TwilightEch03s/bomb-golf#readme",
+  "devDependencies": {
+    "vite": "^7.2.4"
+  }
+}
