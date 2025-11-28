@@ -1,5 +1,8 @@
 import * as THREE from "https://esm.sh/three@0.181.2";
 import { OrbitControls } from "https://esm.sh/three@0.181.2/examples/jsm/controls/OrbitControls.js";
+
+// Ammo.js is loaded from CDN in index.html
+// deno-lint-ignore no-explicit-any
 declare const Ammo: any;
 
 let scene: THREE.Scene;
@@ -106,7 +109,8 @@ function createWorld() {
   const size = 40;
 
   // Ground
-  const ground = new THREE.Mesh(
+  const ground = createHole(20, 0, 5, 0);
+  /*const ground = new THREE.Mesh(
     new THREE.BoxGeometry(size, 1, size),
     new THREE.MeshStandardMaterial({ color: 0x333333 }),
   );
@@ -117,7 +121,7 @@ function createWorld() {
     x: 0,
     y: -0.5,
     z: 0,
-  });
+  });*/
 
   // Invisible walls
   addWalls(size / 2);
@@ -140,6 +144,99 @@ function createWorld() {
     { x: HOLE.x, y: -2, z: HOLE.z },
   );
   hole.mesh.visible = false;
+}
+
+function createHole(
+  planeSize: any,
+  planePosition: any,
+  holeSize: any,
+  holePosition: any,
+) {
+  // Three.js visual mesh
+  const outer = new THREE.Shape();
+  outer.moveTo(-planeSize, -planeSize);
+  outer.lineTo(planeSize, -planeSize);
+  outer.lineTo(planeSize, planeSize);
+  outer.lineTo(-planeSize, planeSize);
+  outer.lineTo(-planeSize, -planeSize);
+
+  const hole = new THREE.Path();
+  hole.moveTo(-holeSize, -holeSize);
+  hole.lineTo(holeSize, -holeSize);
+  hole.lineTo(holeSize, holeSize);
+  hole.lineTo(-holeSize, holeSize);
+  hole.lineTo(-holeSize, -holeSize);
+
+  outer.holes.push(hole);
+
+  const geometry = new THREE.ShapeGeometry(outer);
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x999999,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  scene.add(mesh);
+  mesh.rotation.x = -Math.PI / 2;
+
+  // Ammo compound shape
+  const compound = new Ammo.btCompoundShape();
+  const transform = new Ammo.btTransform();
+  transform.setIdentity();
+
+  let top = new Ammo.btBoxShape(
+    new Ammo.btVector3(planeSize, (planeSize - holeSize) / 2, 0.1),
+  );
+  transform.setOrigin(
+    new Ammo.btVector3(0, planeSize - (planeSize - holeSize) / 2, 0),
+  );
+  compound.addChildShape(transform, top);
+
+  let bottom = new Ammo.btBoxShape(
+    new Ammo.btVector3(planeSize, (planeSize - holeSize) / 2, 0.1),
+  );
+  transform.setOrigin(
+    new Ammo.btVector3(0, -(planeSize - (planeSize - holeSize) / 2), 0),
+  );
+  compound.addChildShape(transform, bottom);
+
+  console.log(-(planeSize - (planeSize - holeSize) / 2), 0);
+  let left = new Ammo.btBoxShape(
+    new Ammo.btVector3((planeSize - holeSize) / 2, holeSize, 0.1),
+  );
+  transform.setOrigin(
+    new Ammo.btVector3(-(planeSize - (planeSize - holeSize) / 2), 0, 0),
+  );
+  compound.addChildShape(transform, left);
+
+  let right = new Ammo.btBoxShape(
+    new Ammo.btVector3((planeSize - holeSize) / 2, holeSize, 0.1),
+  );
+  transform.setOrigin(
+    new Ammo.btVector3(planeSize - (planeSize - holeSize) / 2, 0, 0),
+  );
+  compound.addChildShape(transform, right);
+
+  // Rigid body creation, rotated flat
+  const rbTransform = new Ammo.btTransform();
+  rbTransform.setIdentity();
+
+  const quat = new Ammo.btQuaternion();
+  quat.setRotation(new Ammo.btVector3(1, 0, 0), -Math.PI / 2);
+  rbTransform.setRotation(quat);
+  rbTransform.setOrigin(new Ammo.btVector3(0, 0, 0));
+
+  const motionState = new Ammo.btDefaultMotionState(rbTransform);
+  const localInertia = new Ammo.btVector3(0, 0, 0);
+  const rbInfo = new Ammo.btRigidBodyConstructionInfo(
+    0,
+    motionState,
+    compound,
+    localInertia,
+  );
+  const body = new Ammo.btRigidBody(rbInfo);
+
+  physicsWorld.addRigidBody(body);
+  return body;
 }
 
 /* ---------------------- WALLS ---------------------- */
@@ -167,7 +264,7 @@ function addWalls(size: number) {
 
 /* ---------------------- BODY ---------------------- */
 
-function addBody(shape: any, mass: number, pos: any) {
+function addBody(shape: Ammo.btCollisionShape, mass: number, pos: any) {
   const mesh = shape instanceof Ammo.btSphereShape
     ? new THREE.Mesh(
       new THREE.SphereGeometry(1, 32, 32),
