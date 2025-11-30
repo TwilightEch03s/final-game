@@ -206,8 +206,6 @@ export function addWalls(
   });
 }
 
-/* ---------------------- BODY ---------------------- */
-
 export function addBody(
   shape: Ammo.btCollisionShape,
   mass: number,
@@ -225,7 +223,7 @@ export function addBody(
       new THREE.MeshStandardMaterial({ color: 0x999999 }),
     )
     : new THREE.Mesh(
-      new THREE.BoxGeometry(2, 2, 2),
+      new THREE.BoxGeometry(1.5, 1.5, 1.5),
       new THREE.MeshStandardMaterial({ color: 0x666666 }),
     );
 

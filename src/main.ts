@@ -38,7 +38,7 @@ let powerMultiplier = 1.0;
 const WEAK = 0.6;
 const STRONG = 1.6;
 
-const tries = 3;
+let tries = 3;
 let gameEnded = false;
 
 const HOLE = { x: 10, z: 10 };
@@ -118,24 +118,13 @@ function createWorld() {
     { width: size, height: size },
     { x: 0, y: 0 },
     {
-      width: 3,
-      height: 3,
+      width: 1.5,
+      height: 1.5,
     },
-    { x: 10, y: 10 },
+    { x: HOLE.x, y: HOLE.z },
     scene,
     physicsWorld,
   );
-
-  // Hole trigger (optional)
-  const hole = addBody(
-    new Ammo.btBoxShape(new Ammo.btVector3(1.5, 1.5, 1.5)),
-    0,
-    { x: HOLE.x, y: -2, z: HOLE.z },
-    scene,
-    bodies,
-    physicsWorld,
-  );
-  hole.mesh.visible = false;
 
   // Invisible walls
   addWalls(size, scene, bodies, physicsWorld);
@@ -201,7 +190,7 @@ function bindInput() {
     const k = (e as KeyboardEvent).code;
 
     // Only let player charge if ball is nearly stopped
-    if (k === "Space") charging = true;
+    if (k === "Space" && canShoot()) charging = true;
 
     if (k === "Digit1") {
       powerMultiplier = WEAK;
@@ -226,6 +215,11 @@ function canShoot(): boolean {
 
   const vel = ballBody.getLinearVelocity();
   const speed = Math.sqrt(vel.x() ** 2 + vel.y() ** 2 + vel.z() ** 2);
+
+  if ((speed < 0.05) && (tries == 0)) {
+    alert("You lose D:");
+    location.reload();
+  }
 
   return speed < 0.05 && !gameEnded;
 }
@@ -258,6 +252,8 @@ function shoot() {
 
   ballBody.activate(true);
   ballBody.applyCentralImpulse(impulse);
+  tries--;
+  updateUI();
 }
 
 /* ---------------------- LOOP ---------------------- */
@@ -300,7 +296,7 @@ function animate() {
 
 function checkWin() {
   const dx = ballMesh.position.x - HOLE.x;
-  const dz = ballMesh.position.z - HOLE.z;
+  const dz = ballMesh.position.z - (-HOLE.z); // Not sure what's going on with the Ammo.js directions
   if (Math.sqrt(dx * dx + dz * dz) < 2.5 && ballMesh.position.y < -2) {
     gameEnded = true;
     alert("🎉 HOLE IN ONE!");
