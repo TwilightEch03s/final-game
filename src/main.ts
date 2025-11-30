@@ -109,7 +109,10 @@ function createWorld() {
   const size = 40;
 
   // Ground
-  const ground = createHole(20, 0, 5, 0);
+  const ground = createHole({ width: 20, height: 20 }, { x: 6, y: 5 }, {
+    width: 5,
+    height: 5,
+  }, { x: 5, y: 0 });
   /*const ground = new THREE.Mesh(
     new THREE.BoxGeometry(size, 1, size),
     new THREE.MeshStandardMaterial({ color: 0x333333 }),
@@ -124,7 +127,7 @@ function createWorld() {
   });*/
 
   // Invisible walls
-  addWalls(size / 2);
+  //addWalls(size / 2);
 
   // Ball
   const ballShape = new Ammo.btSphereShape(1);
@@ -146,26 +149,66 @@ function createWorld() {
   hole.mesh.visible = false;
 }
 
+interface RectSize {
+  width: number;
+  height: number;
+}
+
+interface Position {
+  x: number;
+  y: number;
+}
+
 function createHole(
-  planeSize: any,
-  planePosition: any,
-  holeSize: any,
-  holePosition: any,
+  planeSize: RectSize,
+  planePosition: Position,
+  holeSize: RectSize,
+  holePosition: Position,
 ) {
   // Three.js visual mesh
   const outer = new THREE.Shape();
-  outer.moveTo(-planeSize, -planeSize);
-  outer.lineTo(planeSize, -planeSize);
-  outer.lineTo(planeSize, planeSize);
-  outer.lineTo(-planeSize, planeSize);
-  outer.lineTo(-planeSize, -planeSize);
+  outer.moveTo(
+    -planeSize.width + planePosition.x,
+    -planeSize.height + planePosition.y,
+  );
+  outer.lineTo(
+    planeSize.width + planePosition.x,
+    -planeSize.height + planePosition.y,
+  );
+  outer.lineTo(
+    planeSize.width + planePosition.x,
+    planeSize.height + planePosition.y,
+  );
+  outer.lineTo(
+    -planeSize.width + planePosition.x,
+    planeSize.height + planePosition.y,
+  );
+  outer.lineTo(
+    -planeSize.width + planePosition.x,
+    -planeSize.height + planePosition.y,
+  );
 
   const hole = new THREE.Path();
-  hole.moveTo(-holeSize, -holeSize);
-  hole.lineTo(holeSize, -holeSize);
-  hole.lineTo(holeSize, holeSize);
-  hole.lineTo(-holeSize, holeSize);
-  hole.lineTo(-holeSize, -holeSize);
+  hole.moveTo(
+    -holeSize.width + holePosition.x,
+    -holeSize.height + holePosition.y,
+  );
+  hole.lineTo(
+    holeSize.width + holePosition.x,
+    -holeSize.height + holePosition.y,
+  );
+  hole.lineTo(
+    holeSize.width + holePosition.x,
+    holeSize.height + holePosition.y,
+  );
+  hole.lineTo(
+    -holeSize.width + holePosition.x,
+    holeSize.height + holePosition.y,
+  );
+  hole.lineTo(
+    -holeSize.width + holePosition.x,
+    -holeSize.height + holePosition.y,
+  );
 
   outer.holes.push(hole);
 
@@ -183,38 +226,172 @@ function createHole(
   const transform = new Ammo.btTransform();
   transform.setIdentity();
 
-  let top = new Ammo.btBoxShape(
-    new Ammo.btVector3(planeSize, (planeSize - holeSize) / 2, 0.1),
+  console.log(
+    planeSize.width,
+    ((holePosition.y - planePosition.y) +
+      (planeSize.height - holeSize.height)) / 2,
   );
+
+  console.log("x, y");
+  console.log(
+    planePosition.x,
+    -(planePosition.y + holePosition.y) / 2 +
+      planeSize.height -
+      (planeSize.height - holeSize.height) / 2,
+  );
+  let top = new Ammo.btBoxShape(
+    new Ammo.btVector3(
+      planeSize.width,
+      ((holePosition.y - planePosition.y) +
+        (planeSize.height - holeSize.height)) / 2,
+      0.1,
+    ),
+  );
+
   transform.setOrigin(
-    new Ammo.btVector3(0, planeSize - (planeSize - holeSize) / 2, 0),
+    new Ammo.btVector3(
+      planePosition.x,
+      -(-(planePosition.y + holePosition.y) / 2 +
+        planeSize.height -
+        (planeSize.height - holeSize.height) / 2),
+      0,
+    ),
   );
   compound.addChildShape(transform, top);
 
+  let topGeo = new THREE.BoxGeometry(
+    planeSize.width * 2,
+    (holePosition.y - planePosition.y) + (planeSize.height - holeSize.height),
+    0.1,
+  );
+  let topWireframe = new THREE.WireframeGeometry(topGeo);
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+  const topLine = new THREE.LineSegments(topWireframe, lineMaterial);
+  topLine.position.set(
+    planePosition.x,
+    0,
+    -(planePosition.y + holePosition.y) / 2 +
+      planeSize.height -
+      (planeSize.height - holeSize.height) / 2,
+  );
+  topLine.rotation.x = Math.PI / 2;
+  scene.add(topLine);
+
+  console.log(
+    planeSize.width,
+    ((planeSize.height - holeSize.height) -
+      (holePosition.y - planePosition.y)) / 2,
+  );
+
+  console.log("x, y");
+  console.log(
+    planePosition.x,
+    -(planeSize.height + ((planePosition.y + holePosition.y) / 2) -
+      (planeSize.height - holeSize.height) / 2),
+  );
   let bottom = new Ammo.btBoxShape(
-    new Ammo.btVector3(planeSize, (planeSize - holeSize) / 2, 0.1),
+    new Ammo.btVector3(
+      planeSize.width,
+      ((planeSize.height - holeSize.height) -
+        (holePosition.y - planePosition.y)) / 2,
+      0.1,
+    ),
   );
   transform.setOrigin(
-    new Ammo.btVector3(0, -(planeSize - (planeSize - holeSize) / 2), 0),
+    new Ammo.btVector3(
+      planePosition.x,
+      -(-(planeSize.height + ((planePosition.y + holePosition.y) / 2) -
+        (planeSize.height - holeSize.height) / 2)),
+      0,
+    ),
   );
   compound.addChildShape(transform, bottom);
 
-  console.log(-(planeSize - (planeSize - holeSize) / 2), 0);
+  let bottomGeo = new THREE.BoxGeometry(
+    planeSize.width * 2,
+    (planeSize.height - holeSize.height) - (holePosition.y - planePosition.y),
+    0.1,
+  );
+  let bottomWireframe = new THREE.WireframeGeometry(bottomGeo);
+  const bottomLine = new THREE.LineSegments(bottomWireframe);
+  bottomLine.position.set(
+    planePosition.x,
+    0,
+    -(planeSize.height + ((planePosition.y + holePosition.y) / 2) -
+      (planeSize.height - holeSize.height) / 2),
+  );
+  bottomLine.rotation.x = Math.PI / 2;
+  scene.add(bottomLine);
+
   let left = new Ammo.btBoxShape(
-    new Ammo.btVector3((planeSize - holeSize) / 2, holeSize, 0.1),
+    new Ammo.btVector3(
+      ((holePosition.x - planePosition.x) +
+        (planeSize.width - holeSize.width)) / 2,
+      holeSize.height,
+      0.1,
+    ),
   );
   transform.setOrigin(
-    new Ammo.btVector3(-(planeSize - (planeSize - holeSize) / 2), 0, 0),
+    new Ammo.btVector3(
+      (planePosition.x / 2) - (planeSize.width - (holePosition.x / 2) -
+        (planeSize.width - holeSize.width) / 2),
+      -holePosition.y,
+      0,
+    ),
   );
   compound.addChildShape(transform, left);
 
+  let leftGeo = new THREE.BoxGeometry(
+    (holePosition.x - planePosition.x) + (planeSize.width - holeSize.width),
+    holeSize.height * 2,
+    0.1,
+  );
+  let leftWireFrame = new THREE.WireframeGeometry(leftGeo);
+  const lineMaterial2 = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+  const leftLine = new THREE.LineSegments(leftWireFrame, lineMaterial2);
+  leftLine.position.set(
+    (planePosition.x / 2) - (planeSize.width - (holePosition.x / 2) -
+      (planeSize.width - holeSize.width) / 2),
+    0,
+    -holePosition.y,
+  );
+  leftLine.rotation.x = Math.PI / 2;
+  scene.add(leftLine);
+
   let right = new Ammo.btBoxShape(
-    new Ammo.btVector3((planeSize - holeSize) / 2, holeSize, 0.1),
+    new Ammo.btVector3(
+      ((planeSize.width - holeSize.width) -
+        (holePosition.x - planePosition.x)) / 2,
+      holeSize.height,
+      0.1,
+    ),
   );
   transform.setOrigin(
-    new Ammo.btVector3(planeSize - (planeSize - holeSize) / 2, 0, 0),
+    new Ammo.btVector3(
+      (planePosition.x / 2) + (holePosition.x / 2) + planeSize.width -
+        (planeSize.width - holeSize.width) / 2,
+      -holePosition.y,
+      0,
+    ),
   );
   compound.addChildShape(transform, right);
+
+  let rightGeo = new THREE.BoxGeometry(
+    (planeSize.width - holeSize.width) - (holePosition.x - planePosition.x),
+    holeSize.height * 2,
+    0.1,
+  );
+  let rightWireFrame = new THREE.WireframeGeometry(rightGeo);
+  const lineMaterial3 = new THREE.LineBasicMaterial({ color: 0x0000ff });
+  const rightLine = new THREE.LineSegments(rightWireFrame, lineMaterial3);
+  rightLine.position.set(
+    (planePosition.x / 2) + (holePosition.x / 2) + planeSize.width -
+      (planeSize.width - holeSize.width) / 2,
+    0,
+    -holePosition.y,
+  );
+  rightLine.rotation.x = Math.PI / 2;
+  scene.add(rightLine);
 
   // Rigid body creation, rotated flat
   const rbTransform = new Ammo.btTransform();
@@ -337,7 +514,7 @@ function bindInput() {
     const k = (e as KeyboardEvent).code;
 
     // Only let player charge if ball is nearly stopped
-    if (k === "Space" && canShoot()) charging = true;
+    if (k === "Space") charging = true;
 
     if (k === "Digit1") {
       powerMultiplier = WEAK;
