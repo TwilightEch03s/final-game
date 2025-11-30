@@ -1,3 +1,5 @@
+import { radToDeg } from "https://esm.sh/@types/three@0.181.0/src/math/MathUtils.d.ts";
+import { degToRad } from "https://esm.sh/@types/three@0.181.0/src/math/MathUtils.d.ts";
 import * as THREE from "https://esm.sh/three@0.181.2";
 
 // deno-lint-ignore no-explicit-any
@@ -21,6 +23,8 @@ export function createHole(
   scene: THREE.Scene,
   // deno-lint-ignore no-explicit-any
   physicsWorld: any,
+  elevation: number = 0,
+  rotation: number = 0,
 ) {
   // Three.js visual mesh
   const outer = new THREE.Shape();
@@ -76,7 +80,8 @@ export function createHole(
   });
   const mesh = new THREE.Mesh(geometry, material);
   scene.add(mesh);
-  mesh.rotation.x = -Math.PI / 2;
+  mesh.rotation.x = -Math.PI / 2 + degreesToRadians(rotation);
+  mesh.position.y = elevation;
 
   // Ammo compound shape
   const compound = new Ammo.btCompoundShape();
@@ -97,7 +102,7 @@ export function createHole(
       planePosition.x,
       (planePosition.y + holePosition.y - planeSize.height - holeSize.height) /
         2,
-      0,
+      elevation,
     ),
   );
   compound.addChildShape(transform, top);
@@ -115,7 +120,7 @@ export function createHole(
       planePosition.x,
       (planeSize.height + holeSize.height + planePosition.y + holePosition.y) /
         2,
-      0,
+      elevation,
     ),
   );
   compound.addChildShape(transform, bottom);
@@ -132,7 +137,7 @@ export function createHole(
     new Ammo.btVector3(
       (planePosition.x + holePosition.x - planeSize.width - holeSize.width) / 2,
       holePosition.y,
-      0,
+      elevation,
     ),
   );
 
@@ -150,7 +155,7 @@ export function createHole(
     new Ammo.btVector3(
       (planePosition.x + holePosition.x + holeSize.width + planeSize.width) / 2,
       holePosition.y,
-      0,
+      elevation,
     ),
   );
   compound.addChildShape(transform, right);
@@ -160,7 +165,10 @@ export function createHole(
   rbTransform.setIdentity();
 
   const quat = new Ammo.btQuaternion();
-  quat.setRotation(new Ammo.btVector3(1, 0, 0), -Math.PI / 2);
+  quat.setRotation(
+    new Ammo.btVector3(1, 0, 0),
+    -Math.PI / 2 + degreesToRadians(rotation),
+  );
   rbTransform.setRotation(quat);
   rbTransform.setOrigin(new Ammo.btVector3(0, 0, 0));
 
@@ -247,4 +255,8 @@ export function addBody(
   bodies.push({ body, mesh });
 
   return { body, mesh };
+}
+
+function degreesToRadians(degrees: number) {
+  return degrees * (Math.PI / 180);
 }

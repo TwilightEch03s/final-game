@@ -124,6 +124,8 @@ function createWorld() {
     { x: HOLE.x, y: HOLE.z },
     scene,
     physicsWorld,
+    0,
+    
   );
 
   // Invisible walls
