@@ -1,6 +1,6 @@
 import * as THREE from "https://esm.sh/three@0.181.2";
 import { OrbitControls } from "https://esm.sh/three@0.181.2/examples/jsm/controls/OrbitControls.js";
-import { addBody, addWalls, createBox, createHole } from "./utils.ts";
+import { _addWalls, addBody, createBox, createHole } from "./utils.ts";
 
 // Ammo.js is loaded from CDN in index.html
 // deno-lint-ignore no-explicit-any
@@ -24,7 +24,7 @@ const bodies: { body: any; mesh: THREE.Mesh }[] = [];
 let ballBody: any;
 let ballMesh: THREE.Mesh;
 
-const GRAVITY = -9.82;
+const GRAVITY = -50;
 const POWER_MAX = 100;
 const POWER_RATE = 40;
 const OVERPOWER = 85;
@@ -38,10 +38,10 @@ let powerMultiplier = 1.0;
 const WEAK = 0.6;
 const STRONG = 1.6;
 
-let tries = 3;
+let tries = 999;
 let gameEnded = false;
 
-const HOLE = { x: 10, z: 10 };
+let HOLE = { x: 10, z: 10 };
 
 let powerFill: HTMLElement;
 let triesText: HTMLElement;
@@ -52,7 +52,7 @@ let modeText: HTMLElement;
 function start() {
   initScene();
   initPhysics();
-  createWorld();
+  _createWorld1();
   initUI();
   bindInput();
   animate();
@@ -107,57 +107,6 @@ function initPhysics() {
   physicsWorld.setGravity(new Ammo.btVector3(0, GRAVITY, 0));
   tmpTrans = new Ammo.btTransform();
 }
-
-/* ---------------------- WORLD ---------------------- */
-
-function createWorld() {
-  const size = 25;
-
-  // Ground
-  const _groundHole = createHole(
-    { width: size, height: size },
-    { x: 0, z: 0 },
-    {
-      width: 1.5,
-      height: 1.5,
-    },
-    { x: HOLE.x, z: HOLE.z },
-    scene,
-    physicsWorld,
-    0,
-  );
-
-  const _box = createBox(
-    { width: 5, height: 5, depth: 5 },
-    { x: 0, z: 0 },
-    scene,
-    physicsWorld,
-    0,
-    0,
-  );
-
-  // Invisible walls
-  addWalls(size, scene, bodies, physicsWorld);
-
-  // Ball
-  const ballShape = new Ammo.btSphereShape(1);
-  const ball = addBody(
-    ballShape,
-    1,
-    { x: 0, y: 2, z: 6 },
-    scene,
-    bodies,
-    physicsWorld,
-  );
-  ballMesh = ball.mesh;
-  ballBody = ball.body;
-
-  // ✅ HIGH FRICTION & DAMPING
-  ballBody.setFriction(2.5);
-  ballBody.setRollingFriction(1.2);
-  ballBody.setDamping(0.6, 0.9);
-}
-/* ---------------------- WALLS ---------------------- */
 
 /* ---------------------- UI ---------------------- */
 
@@ -333,3 +282,86 @@ function waitForAmmo() {
 }
 
 waitForAmmo();
+
+/* ---------------------- WORLD 1 ---------------------- */
+
+function _createWorld1() {
+  const worldSizeX = 4;
+  const worldSizeY = 16;
+  const ballSpawn = { x: 0, y: 2, z: 12 };
+  tries = 3;
+  HOLE = { x: 0, z: 11 };
+  const normalRestitution = 1.1;
+
+  // Ground
+  const _groundHole = createHole(
+    { width: worldSizeX, height: worldSizeY },
+    { x: 0, z: 0 },
+    {
+      width: 1.5,
+      height: 1.5,
+    },
+    { x: HOLE.x, z: HOLE.z },
+    scene,
+    physicsWorld,
+    0,
+  );
+
+  // Ball
+  const ballShape = new Ammo.btSphereShape(1);
+  const ball = addBody(
+    ballShape,
+    1,
+    ballSpawn,
+    scene,
+    bodies,
+    physicsWorld,
+  );
+  ballMesh = ball.mesh;
+  ballBody = ball.body;
+
+  // Walls
+
+  const _wall1 = createBox(
+    { width: 1, height: 2, depth: 32 },
+    { x: 4.5, z: 0 },
+    scene,
+    physicsWorld,
+    0.5,
+    normalRestitution,
+  );
+
+  const _wall2 = createBox(
+    { width: 1, height: 2, depth: 32 },
+    { x: -4.5, z: 0 },
+    scene,
+    physicsWorld,
+    0.5,
+    normalRestitution,
+  );
+
+  const _wall3 = createBox(
+    { width: 10, height: 2, depth: 1 },
+    { x: 0, z: -16.5 },
+    scene,
+    physicsWorld,
+    0.5,
+    normalRestitution,
+  );
+
+  const _wall4 = createBox(
+    { width: 10, height: 2, depth: 1 },
+    { x: 0, z: 16.5 },
+    scene,
+    physicsWorld,
+    0.5,
+    normalRestitution,
+  );
+
+  // HIGH FRICTION & DAMPING
+  ballBody.setFriction(2.5);
+  ballBody.setRollingFriction(1.2);
+  ballBody.setDamping(0.6, 0.9);
+}
+
+/* ---------------------- WORLD 2 ---------------------- */

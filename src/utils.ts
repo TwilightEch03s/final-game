@@ -26,6 +26,7 @@ export function createBox(
   // deno-lint-ignore no-explicit-any
   physicsWorld: any,
   elevation: number = 0,
+  restitution: number = 1.1,
   rotation: number = 0,
   color: number = 0x666666,
 ) {
@@ -69,6 +70,7 @@ export function createBox(
 
   const motion = new Ammo.btDefaultMotionState(transform);
   const inertia = new Ammo.btVector3(0, 0, 0);
+  collision.calculateLocalInertia(0, inertia);
   const rbInfo = new Ammo.btRigidBodyConstructionInfo(
     0,
     motion,
@@ -77,7 +79,7 @@ export function createBox(
   );
 
   const body = new Ammo.btRigidBody(rbInfo);
-  //body.setRestitution(0.8);
+  body.setRestitution(restitution);
 
   physicsWorld.addRigidBody(body);
   return body;
@@ -254,7 +256,7 @@ export function createHole(
   return body;
 }
 
-export function addWalls(
+export function _addWalls(
   size: number,
   scene: THREE.Scene,
   // deno-lint-ignore no-explicit-any
@@ -317,7 +319,7 @@ export function addBody(
   const body = new Ammo.btRigidBody(
     new Ammo.btRigidBodyConstructionInfo(mass, motion, shape, inertia),
   );
-  //body.setRestitution(0.8);
+  body.setRestitution(0.8);
 
   physicsWorld.addRigidBody(body);
   bodies.push({ body, mesh });
