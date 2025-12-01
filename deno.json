@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "types": ["./src/types/ammo.d.ts"],
     "lib": [
       "deno.window",
       "dom",
