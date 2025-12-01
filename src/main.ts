@@ -1,6 +1,6 @@
 import * as THREE from "https://esm.sh/three@0.181.2";
 import { OrbitControls } from "https://esm.sh/three@0.181.2/examples/jsm/controls/OrbitControls.js";
-import { addBody, addWalls, createHole } from "./utils.ts";
+import { addBody, addWalls, createBox, createHole } from "./utils.ts";
 
 // Ammo.js is loaded from CDN in index.html
 // deno-lint-ignore no-explicit-any
@@ -116,14 +116,23 @@ function createWorld() {
   // Ground
   const _groundHole = createHole(
     { width: size, height: size },
-    { x: 0, y: 0 },
+    { x: 0, z: 0 },
     {
       width: 1.5,
       height: 1.5,
     },
-    { x: HOLE.x, y: HOLE.z },
+    { x: HOLE.x, z: HOLE.z },
     scene,
     physicsWorld,
+    0,
+  );
+
+  const box = createBox(
+    { width: 5, height: 5, depth: 5 },
+    { x: 0, z: 0 },
+    scene,
+    physicsWorld,
+    0,
     0,
   );
 

@@ -3,6 +3,12 @@ import * as THREE from "https://esm.sh/three@0.181.2";
 // deno-lint-ignore no-explicit-any
 declare const Ammo: any;
 
+interface BoxSize {
+  width: number;
+  height: number;
+  depth: number;
+}
+
 interface RectSize {
   width: number;
   height: number;
@@ -10,7 +16,71 @@ interface RectSize {
 
 interface Position {
   x: number;
-  y: number;
+  z: number;
+}
+
+export function createBox(
+  boxSize: BoxSize,
+  boxPosition: Position,
+  scene: THREE.Scene,
+  // deno-lint-ignore no-explicit-any
+  physicsWorld: any,
+  elevation: number = 0,
+  rotation: number = 0,
+  color: number = 0x666666,
+) {
+  // Create Three.js visual mesh
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(boxSize.width, boxSize.height, boxSize.depth),
+    new THREE.MeshStandardMaterial({ color }),
+  );
+  mesh.position.set(boxPosition.x, elevation, boxPosition.z);
+  mesh.rotation.x = degreesToRadians(rotation);
+  scene.add(mesh);
+
+  const wireframe = new THREE.Mesh(
+    new THREE.BoxGeometry(boxSize.width, boxSize.height, boxSize.depth),
+    new THREE.MeshStandardMaterial({ color: 0x000000, wireframe: true }),
+  );
+  wireframe.position.set(boxPosition.x, elevation, boxPosition.z);
+  wireframe.rotation.x = degreesToRadians(rotation);
+  scene.add(wireframe);
+
+  // Create physics collision
+  const quat = new Ammo.btQuaternion();
+  quat.setRotation(
+    new Ammo.btVector3(1, 0, 0),
+    degreesToRadians(rotation),
+  );
+
+  const transform = new Ammo.btTransform();
+  transform.setIdentity();
+  transform.setRotation(quat);
+  transform.setOrigin(
+    new Ammo.btVector3(boxPosition.x, elevation, boxPosition.z),
+  );
+  const collision = new Ammo.btBoxShape(
+    new Ammo.btVector3(
+      boxSize.width / 2,
+      boxSize.height / 2,
+      boxSize.depth / 2,
+    ),
+  );
+
+  const motion = new Ammo.btDefaultMotionState(transform);
+  const inertia = new Ammo.btVector3(0, 0, 0);
+  const rbInfo = new Ammo.btRigidBodyConstructionInfo(
+    0,
+    motion,
+    collision,
+    inertia,
+  );
+
+  const body = new Ammo.btRigidBody(rbInfo);
+  //body.setRestitution(0.8);
+
+  physicsWorld.addRigidBody(body);
+  return body;
 }
 
 export function createHole(
@@ -28,45 +98,45 @@ export function createHole(
   const outer = new THREE.Shape();
   outer.moveTo(
     -planeSize.width + planePosition.x,
-    -planeSize.height + planePosition.y,
+    -planeSize.height + planePosition.z,
   );
   outer.lineTo(
     planeSize.width + planePosition.x,
-    -planeSize.height + planePosition.y,
+    -planeSize.height + planePosition.z,
   );
   outer.lineTo(
     planeSize.width + planePosition.x,
-    planeSize.height + planePosition.y,
+    planeSize.height + planePosition.z,
   );
   outer.lineTo(
     -planeSize.width + planePosition.x,
-    planeSize.height + planePosition.y,
+    planeSize.height + planePosition.z,
   );
   outer.lineTo(
     -planeSize.width + planePosition.x,
-    -planeSize.height + planePosition.y,
+    -planeSize.height + planePosition.z,
   );
 
   const hole = new THREE.Path();
   hole.moveTo(
     -holeSize.width + holePosition.x,
-    -holeSize.height + holePosition.y,
+    -holeSize.height + holePosition.z,
   );
   hole.lineTo(
     holeSize.width + holePosition.x,
-    -holeSize.height + holePosition.y,
+    -holeSize.height + holePosition.z,
   );
   hole.lineTo(
     holeSize.width + holePosition.x,
-    holeSize.height + holePosition.y,
+    holeSize.height + holePosition.z,
   );
   hole.lineTo(
     -holeSize.width + holePosition.x,
-    holeSize.height + holePosition.y,
+    holeSize.height + holePosition.z,
   );
   hole.lineTo(
     -holeSize.width + holePosition.x,
-    -holeSize.height + holePosition.y,
+    -holeSize.height + holePosition.z,
   );
 
   outer.holes.push(hole);
@@ -77,9 +147,9 @@ export function createHole(
     side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(geometry, material);
-  scene.add(mesh);
   mesh.rotation.x = -Math.PI / 2 + degreesToRadians(rotation);
   mesh.position.y = elevation;
+  scene.add(mesh);
 
   // Ammo compound shape
   const compound = new Ammo.btCompoundShape();
@@ -89,7 +159,7 @@ export function createHole(
   const top = new Ammo.btBoxShape(
     new Ammo.btVector3(
       planeSize.width,
-      ((holePosition.y - planePosition.y) +
+      ((holePosition.z - planePosition.z) +
         (planeSize.height - holeSize.height)) / 2,
       0.1,
     ),
@@ -98,7 +168,7 @@ export function createHole(
   transform.setOrigin(
     new Ammo.btVector3(
       planePosition.x,
-      (planePosition.y + holePosition.y - planeSize.height - holeSize.height) /
+      (planePosition.z + holePosition.z - planeSize.height - holeSize.height) /
         2,
       elevation,
     ),
@@ -109,14 +179,14 @@ export function createHole(
     new Ammo.btVector3(
       planeSize.width,
       ((planeSize.height - holeSize.height) -
-        (holePosition.y - planePosition.y)) / 2,
+        (holePosition.z - planePosition.z)) / 2,
       0.1,
     ),
   );
   transform.setOrigin(
     new Ammo.btVector3(
       planePosition.x,
-      (planeSize.height + holeSize.height + planePosition.y + holePosition.y) /
+      (planeSize.height + holeSize.height + planePosition.z + holePosition.z) /
         2,
       elevation,
     ),
@@ -134,7 +204,7 @@ export function createHole(
   transform.setOrigin(
     new Ammo.btVector3(
       (planePosition.x + holePosition.x - planeSize.width - holeSize.width) / 2,
-      holePosition.y,
+      holePosition.z,
       elevation,
     ),
   );
@@ -152,7 +222,7 @@ export function createHole(
   transform.setOrigin(
     new Ammo.btVector3(
       (planePosition.x + holePosition.x + holeSize.width + planeSize.width) / 2,
-      holePosition.y,
+      holePosition.z,
       elevation,
     ),
   );
