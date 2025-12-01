@@ -1,4 +1,6 @@
-# Devlog Entry - 11/12/2025
+# BOMB-GOLF DEVLOG
+
+## Devlog Entry - 11/12/2025
 
 ## Introducing the Team
 
@@ -29,11 +31,11 @@
 
 - We hope to learn how to create a physics engine from “scratch” and to use outside libraries in programming projects.
 
-# Devlog Entry - 11/21/2025
+## Devlog Entry - 11/21/2025
 
 ## How we satisfied the software requirements
 
-1. Our project is built with TypeScript. At its default, TypeScript does not come with support for 3D rendering and physics simulation. To do 3D rendering and physics simulation, we imported two libraries: three.js and ammo.js. 
+1. Our project is built with TypeScript. At its default, TypeScript does not come with support for 3D rendering and physics simulation. To do 3D rendering and physics simulation, we imported two libraries: three.js and ammo.js.
 
 2. Our project uses Three.js as our third-party 3D rendering library.  We did this by installing the Three library module into our code through Deno.  To actually use it in our code, we imported the module in main.ts.
 
@@ -52,4 +54,3 @@
 ## Reflection
 
 Our team's plan for the game has changed quite significantly through the week.  While we didn't lock in any ideas, we were considering create an escape room puzzle type game, but we decided to make a physics based mini-golf game instead.  While settings things up, we did heavily consider switching from Typescript to JavaScript due to the complications we were having while setting up the libraries, but in the end we got things figured out.  As for roles, we kept things the same, but we did help each other outside of our designated lead roles.
-
