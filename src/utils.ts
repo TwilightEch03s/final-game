@@ -1,5 +1,3 @@
-import { radToDeg } from "https://esm.sh/@types/three@0.181.0/src/math/MathUtils.d.ts";
-import { degToRad } from "https://esm.sh/@types/three@0.181.0/src/math/MathUtils.d.ts";
 import * as THREE from "https://esm.sh/three@0.181.2";
 
 // deno-lint-ignore no-explicit-any
