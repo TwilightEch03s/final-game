@@ -127,7 +127,7 @@ function createWorld() {
     0,
   );
 
-  const box = createBox(
+  const _box = createBox(
     { width: 5, height: 5, depth: 5 },
     { x: 0, z: 0 },
     scene,
