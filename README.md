@@ -33,7 +33,7 @@
 
 ## Devlog Entry - 11/21/2025
 
-## How we satisfied the software requirements
+## How we satisfied the F1 software requirements
 
 1. Our project is built with TypeScript. At its default, TypeScript does not come with support for 3D rendering and physics simulation. To do 3D rendering and physics simulation, we imported two libraries: three.js and ammo.js.
 
@@ -51,6 +51,22 @@
 
 8. The codebase for our prototype has post-push automation with GitHub. Once we push our code to the repository, the GitHub pages automatically builds and deploys our files. Once the files are built, our prototype is deployed onto to GitHub Pages with everything working.
 
-## Reflection
+## F1 Reflection
 
 Our team's plan for the game has changed quite significantly through the week. While we didn't lock in any ideas, we were considering create an escape room puzzle type game, but we decided to make a physics based mini-golf game instead. While settings things up, we did heavily consider switching from Typescript to JavaScript due to the complications we were having while setting up the libraries, but in the end we got things figured out. As for roles, we kept things the same, but we did help each other outside of our designated lead roles.
+
+## Devlog Entry - 12/01/2025
+
+## How we satisfied the F2 software requirements
+
+1. Our 3D rendering and physics engine has not changed since F1. We are still using three.js to render 3D graphics and Ammo.js to simulate physics. We plan on doing the same for F3.
+2. Our game allows the player to transition to two different scenes. The player starts in the main room where they can collect items and move into the next scene which has more items. Once they finish collecting all the items, they can try to complete the golf mini-game.
+3. The game allows the player to interact with specific objects in the game world. In the first two scenes, players can pickup blocks which corresponds to how many tries they will have in the bomb golf mini-game. Furthermore, in the golf mini-game, the player interacts with the bomb by rotating their view to aim and by using space to launch the ball.
+4. As stated above, the player can pickup blocks which corresponds to how many tries they will have in the bomb golf mini-game. This affects the way that the mini-game is played because depending on how many tries they have, the strategy for the mini-game would be different. If the player does not pick up any blocks, they will have 0 tries and as a result, cannot win in the mini-game.
+5. The physics based puzzle in our game is the same as in F1. The physics based puzzle is the bomb mini-game. The player would have a certain amount of tries to get the bomb into the hole in order to win, with the amount of tries tied to what the player does in the first two rooms.
+6. Just like in F1, the player can succeed in the puzzle by getting bomb into the hole within a certain amount of attempts. If they fail to get the bomb into the hole within a certain amount of attempts, the bomb would explode and the player would lose.
+7. Through gameplay, the player can reach 2 endings. The good ending is reached if the player successfully completes the golf puzzle. The bad ending is reached if the player fails the golf puzzle.
+
+## F2 Reflection
+
+Our team's plan for the game hasn't really changed between F1 and F2. The goal of our game was to create a golf mini-game and the F2 requirements just built onto that. We didn't have anything set in mind for gameplay outside of just golfing so the requirements for F2 gave us some direction as to what to do in terms of that.
