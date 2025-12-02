@@ -32,6 +32,7 @@ interface AmmoWorld {
   setGravity(gravity: unknown): void;
   stepSimulation(timeStep: number, maxSubSteps?: number): void;
   removeRigidBody(body: AmmoRigidBody): void;
+  addRigidBody(body: AmmoRigidBody): void;
 }
 
 // Ammo.js is loaded globally
@@ -492,7 +493,7 @@ function _createWorld1() {
   const size = 8;
   const triggerGeo = new THREE.PlaneGeometry(size, size);
   const triggerMat = new THREE.MeshStandardMaterial({
-    color: 0x00ff00,
+    color: 0xEE4B2B,
     transparent: true,
     opacity: 0.3,
     side: THREE.DoubleSide,

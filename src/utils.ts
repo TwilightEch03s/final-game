@@ -1,4 +1,41 @@
+/// <reference path="./types/ammo.d.ts" />
 import * as THREE from "https://esm.sh/three@0.181.2";
+
+// Ammo.js physics types
+interface AmmoCollisionShape {
+  calculateLocalInertia(mass: number, inertia: unknown): void;
+}
+
+interface AmmoVector3 {
+  x(): number;
+  y(): number;
+  z(): number;
+}
+
+interface AmmoTransform {
+  getOrigin(): AmmoVector3;
+}
+
+interface AmmoMotionState {
+  getWorldTransform(transform: AmmoTransform): void;
+}
+
+interface AmmoRigidBody {
+  getMotionState(): AmmoMotionState | null;
+  getLinearVelocity(): AmmoVector3;
+  activate(forceActivation?: boolean): void;
+  applyCentralImpulse(impulse: unknown): void;
+  setFriction(friction: number): void;
+  setRollingFriction(friction: number): void;
+  setDamping(linear: number, angular: number): void;
+}
+
+interface AmmoWorld {
+  setGravity(gravity: unknown): void;
+  stepSimulation(timeStep: number, maxSubSteps?: number): void;
+  removeRigidBody(body: AmmoRigidBody): void;
+  addRigidBody(body: AmmoRigidBody): void;
+}
 
 // deno-lint-ignore no-explicit-any
 declare const Ammo: any;
@@ -23,8 +60,7 @@ export function createBox(
   boxSize: BoxSize,
   boxPosition: Position,
   scene: THREE.Scene,
-  // deno-lint-ignore no-explicit-any
-  physicsWorld: any,
+  physicsWorld: AmmoWorld,
   elevation: number = 0,
   restitution: number = 1.1,
   rotation: number = 0,
@@ -91,8 +127,7 @@ export function createHole(
   holeSize: RectSize,
   holePosition: Position,
   scene: THREE.Scene,
-  // deno-lint-ignore no-explicit-any
-  physicsWorld: any,
+  physicsWorld: AmmoWorld,
   elevation: number = 0,
   rotation: number = 0,
 ) {
@@ -259,10 +294,8 @@ export function createHole(
 export function _addWalls(
   size: number,
   scene: THREE.Scene,
-  // deno-lint-ignore no-explicit-any
-  bodies: any,
-  // deno-lint-ignore no-explicit-any
-  physicsWorld: any,
+  bodies: { body: AmmoRigidBody; mesh: THREE.Mesh }[],
+  physicsWorld: AmmoWorld,
 ) {
   const h = 5;
   const t = 1;
@@ -285,15 +318,12 @@ export function _addWalls(
 }
 
 export function addBody(
-  shape: Ammo.btCollisionShape,
+  shape: AmmoCollisionShape,
   mass: number,
-  // deno-lint-ignore no-explicit-any
-  pos: any,
+  pos: { x: number; y: number; z: number },
   scene: THREE.Scene,
-  // deno-lint-ignore no-explicit-any
-  bodies: any,
-  // deno-lint-ignore no-explicit-any
-  physicsWorld: any,
+  bodies: { body: AmmoRigidBody; mesh: THREE.Mesh }[],
+  physicsWorld: AmmoWorld,
 ) {
   const mesh = shape instanceof Ammo.btSphereShape
     ? new THREE.Mesh(
