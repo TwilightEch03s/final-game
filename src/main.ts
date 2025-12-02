@@ -262,6 +262,132 @@ function updatePlayerMovement() {
   checkStartWorld2Trigger();
 }
 
+// Items the player can pick up
+interface Item {
+  mesh: THREE.Mesh;
+  body: AmmoRigidBody | undefined;
+  position: THREE.Vector3;
+  name: string;
+  interactable: boolean;
+  pickedUp: boolean;
+}
+
+const items: Item[] = [];
+
+// Item functions
+function createItem(
+  pos: { x: number; y: number; z: number },
+  size = 1,
+  isPhysical = false,
+) {
+  const geo = new THREE.BoxGeometry(size, size, size);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+  const mesh = new THREE.Mesh(geo, mat);
+
+  mesh.position.set(pos.x, pos.y ?? size / 2, pos.z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+
+  let body: AmmoRigidBody | undefined;
+
+  if (isPhysical) {
+    const shape = new Ammo.btBoxShape(
+      new Ammo.btVector3(size / 2, size / 2, size / 2),
+    );
+    const res = addBody(shape, 0, pos, scene, bodies, physicsWorld);
+    body = res.body;
+  }
+
+  const item: Item = {
+    mesh,
+    body,
+    position: mesh.position.clone(),
+    name: "cube",
+    interactable: true,
+    pickedUp: false,
+  };
+
+  items.push(item);
+
+  return item;
+}
+
+// helper: current player position (returns THREE.Vector3 or null)
+function getPlayerPosition(): THREE.Vector3 | null {
+  if (player) return player.position;
+  return null;
+}
+
+let wantPickup = false;
+
+// keydown -> request a pickup attempt
+addEventListener("keydown", (e) => {
+  if (e.code === "KeyE") {
+    wantPickup = true;
+  }
+});
+
+// Call this every frame (already in animate())
+function updateItems() {
+  if (!wantPickup) return;
+
+  // consume the pickup request — only process once per key press
+  wantPickup = false;
+
+  const playerPos = getPlayerPosition();
+  if (!playerPos) {
+    // debug: no active player (shouldn't usually happen)
+    console.warn("Pickup attempted but no player/ball present.");
+    return;
+  }
+
+  const PICKUP_RANGE = 2.5;
+  let pickedAny = false;
+
+  for (const item of items) {
+    if (item.pickedUp) continue;
+
+    const dx = item.mesh.position.x - playerPos.x;
+    const dy = item.mesh.position.y - playerPos.y;
+    const dz = item.mesh.position.z - playerPos.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+    // debug line — remove later
+    // console.log("dist to", item.name, dist);
+
+    if (dist <= PICKUP_RANGE) {
+      pickupItem(item);
+      pickedAny = true;
+      break; // only pick up one item per press
+    }
+  }
+
+  if (!pickedAny) {
+    // optional: feedback so player knows they were not close enough
+    console.log("No items in range to pick up.");
+  }
+}
+
+function pickupItem(item: Item) {
+  item.pickedUp = true;
+  item.interactable = false;
+
+  // remove 3D model
+  scene.remove(item.mesh);
+
+  // remove physics
+  if (item.body) {
+    physicsWorld.removeRigidBody(item.body);
+  }
+
+  if (item.mesh.parent) {
+    item.mesh.parent.remove(item.mesh);
+  }
+
+  console.log("Item picked up:", item.name);
+}
+
 // Start World 1
 const WORLD1_TRIGGER = { x: 0, z: -15, size: 5 };
 function checkStartWorld1Trigger() {
@@ -373,6 +499,8 @@ function animate() {
 
   if (ballMesh && !gameEnded) checkWin();
 
+  updateItems();
+
   controls.update();
   renderer.render(scene, camera);
 }
@@ -434,6 +562,10 @@ function _createWorld0() {
   ground.position.y = -groundThickness / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // Items
+  createItem({ x: -12, y: 0.8, z: -5 }, 1, true);
+  createItem({ x: 12, y: 0.8, z: 8 }, 1, true);
 
   // Player (triangle shape)
   const shape = new THREE.Shape();
@@ -517,6 +649,9 @@ function _createWorld1() {
   ground.position.y = -groundThickness / 2;
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // Items
+  createItem({ x: -10, y: 0.8, z: 9 }, 1, true);
 
   // Player (triangle shape)
   const shape = new THREE.Shape();
