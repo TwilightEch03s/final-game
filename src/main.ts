@@ -59,7 +59,8 @@ let player: THREE.Mesh;
 let world1Started = false;
 let world2Started = false;
 let gameEnded = false;
-let tries = 999;
+let tries = 0;
+let inventory = 0;
 
 // Constants
 const GRAVITY = -50;
@@ -82,6 +83,7 @@ const STRONG = 1.6;
 let powerFill: HTMLElement;
 let triesText: HTMLElement;
 let modeText: HTMLElement;
+let interactPrompt: HTMLElement;
 
 // Movement keys
 const keys: Record<string, boolean> = {};
@@ -172,13 +174,31 @@ function initUI() {
   modeEl.style.fontSize = "18px";
   document.body.appendChild(modeEl);
 
+  const promptEl = document.createElement("div");
+  promptEl.style.position = "fixed";
+  promptEl.style.bottom = "50%";
+  promptEl.style.left = "50%";
+  promptEl.style.transform = "translate(-50%, 50%)";
+  promptEl.style.color = "white";
+  promptEl.style.fontSize = "24px";
+  promptEl.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+  promptEl.style.padding = "15px 30px";
+  promptEl.style.borderRadius = "10px";
+  promptEl.style.display = "none";
+  promptEl.textContent = "Press E to interact";
+  document.body.appendChild(promptEl);
+
   powerFill = fill;
   triesText = triesEl;
   modeText = modeEl;
+  interactPrompt = promptEl;
 
   powerFill.style.display = "none";
-  triesText.style.display = "none";
+  triesText.style.display = "block";
   modeText.style.display = "none";
+
+  // Initial UI update
+  updateUI();
 }
 
 // Update UI elements
@@ -313,7 +333,7 @@ function createItem(
   return item;
 }
 
-// helper: current player position (returns THREE.Vector3 or null)
+// Get player position
 function getPlayerPosition(): THREE.Vector3 | null {
   if (player) return player.position;
   return null;
@@ -330,19 +350,40 @@ addEventListener("keydown", (e) => {
 
 // Call this every frame (already in animate())
 function updateItems() {
-  if (!wantPickup) return;
-
-  // consume the pickup request — only process once per key press
-  wantPickup = false;
-
   const playerPos = getPlayerPosition();
   if (!playerPos) {
-    // debug: no active player (shouldn't usually happen)
+    interactPrompt.style.display = "none";
+    if (!wantPickup) return;
+    wantPickup = false;
     console.warn("Pickup attempted but no player/ball present.");
     return;
   }
 
   const PICKUP_RANGE = 2.5;
+  let nearItem = false;
+
+  // Check if player is near any item
+  for (const item of items) {
+    if (item.pickedUp) continue;
+
+    const dx = item.mesh.position.x - playerPos.x;
+    const dy = item.mesh.position.y - playerPos.y;
+    const dz = item.mesh.position.z - playerPos.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+    if (dist <= PICKUP_RANGE) {
+      nearItem = true;
+      break;
+    }
+  }
+
+  // Show/hide interact prompt
+  interactPrompt.style.display = nearItem ? "block" : "none";
+
+  // Handle pickup action
+  if (!wantPickup) return;
+  wantPickup = false;
+
   let pickedAny = false;
 
   for (const item of items) {
@@ -353,18 +394,14 @@ function updateItems() {
     const dz = item.mesh.position.z - playerPos.z;
     const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-    // debug line — remove later
-    // console.log("dist to", item.name, dist);
-
     if (dist <= PICKUP_RANGE) {
       pickupItem(item);
       pickedAny = true;
-      break; // only pick up one item per press
+      break;
     }
   }
 
   if (!pickedAny) {
-    // optional: feedback so player knows they were not close enough
     console.log("No items in range to pick up.");
   }
 }
@@ -373,19 +410,38 @@ function pickupItem(item: Item) {
   item.pickedUp = true;
   item.interactable = false;
 
-  // remove 3D model
+  // Remove 3D model
   scene.remove(item.mesh);
 
-  // remove physics
+  // Remove physics body
   if (item.body) {
     physicsWorld.removeRigidBody(item.body);
+
+    // Find and remove mesh from bodies
+    const bodyIndex = bodies.findIndex((b) => b.body === item.body);
+    if (bodyIndex !== -1) {
+      const physicsBodyMesh = bodies[bodyIndex].mesh;
+      scene.remove(physicsBodyMesh);
+      bodies.splice(bodyIndex, 1);
+    }
+
+    // Clean up Ammo objects
+    Ammo.destroy(item.body);
   }
 
-  if (item.mesh.parent) {
-    item.mesh.parent.remove(item.mesh);
-  }
+  // Add to inventory and increase tries
+  inventory++;
+  tries++;
+  updateUI();
 
-  console.log("Item picked up:", item.name);
+  console.log(
+    "Item picked up:",
+    item.name,
+    "| Inventory:",
+    inventory,
+    "| Tries:",
+    tries,
+  );
 }
 
 // Start World 1
@@ -415,7 +471,12 @@ function checkStartWorld2Trigger() {
   const dz = player.position.z - WORLD2_TRIGGER.z;
 
   if (dx * dx + dz * dz < WORLD2_TRIGGER.size * WORLD2_TRIGGER.size) {
-    startWorld2();
+    if (inventory === 0) {
+      alert("💀");
+      location.reload();
+    } else {
+      startWorld2();
+    }
   }
 }
 
@@ -495,6 +556,15 @@ function animate() {
     power = 0;
     overcharged = false;
     updateUI();
+
+    // Check for game over after turn is complete (ball has stopped)
+    if (tries <= 0 && !gameEnded) {
+      gameEnded = true;
+      setTimeout(() => {
+        alert("💀");
+        location.reload();
+      }, 500);
+    }
   }
 
   if (ballMesh && !gameEnded) checkWin();
@@ -535,6 +605,10 @@ waitForAmmo();
 
 // World 0: Starting Room
 function _createWorld0() {
+  // Update UI for World 0
+  triesText.style.display = "block";
+  updateUI();
+
   const world1Size = 8;
   const triggerGeo = new THREE.PlaneGeometry(world1Size, world1Size);
   const triggerMat = new THREE.MeshStandardMaterial({
@@ -621,6 +695,10 @@ function _createWorld1() {
   scene.background = new THREE.Color(0x1a1a1a);
   scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
   addDefaultLights();
+
+  // Update UI for World 1
+  triesText.style.display = "block";
+  updateUI();
 
   const size = 8;
   const triggerGeo = new THREE.PlaneGeometry(size, size);
@@ -716,10 +794,11 @@ function startWorld2() {
   modeText.style.display = "block";
 
   _createWorld2();
+  updateUI();
 }
 
 function _createWorld2() {
-  tries = 3;
+  tries = inventory;
   HOLE = { x: 0, z: 11 };
 
   const ballSpawn = { x: 0, y: 2, z: 12 };
