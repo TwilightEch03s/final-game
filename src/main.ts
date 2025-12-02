@@ -1,8 +1,41 @@
+/// <reference path="./types/ammo.d.ts" />
 import * as THREE from "https://esm.sh/three@0.181.2";
 import { OrbitControls } from "https://esm.sh/three@0.181.2/examples/jsm/controls/OrbitControls.js";
 import { addBody, createBox, createHole } from "./utils.ts";
 
+// Ammo.js physics types
+interface AmmoVector3 {
+  x(): number;
+  y(): number;
+  z(): number;
+}
+
+interface AmmoTransform {
+  getOrigin(): AmmoVector3;
+}
+
+interface AmmoMotionState {
+  getWorldTransform(transform: AmmoTransform): void;
+}
+
+interface AmmoRigidBody {
+  getMotionState(): AmmoMotionState | null;
+  getLinearVelocity(): AmmoVector3;
+  activate(forceActivation?: boolean): void;
+  applyCentralImpulse(impulse: unknown): void;
+  setFriction(friction: number): void;
+  setRollingFriction(friction: number): void;
+  setDamping(linear: number, angular: number): void;
+}
+
+interface AmmoWorld {
+  setGravity(gravity: unknown): void;
+  stepSimulation(timeStep: number, maxSubSteps?: number): void;
+  removeRigidBody(body: AmmoRigidBody): void;
+}
+
 // Ammo.js is loaded globally
+// deno-lint-ignore no-explicit-any
 declare const Ammo: any;
 
 let scene: THREE.Scene;
@@ -12,11 +45,11 @@ let controls: OrbitControls;
 let clock: THREE.Clock;
 
 // Physics
-let physicsWorld: any;
-let tmpTrans: any;
-const bodies: { body: any; mesh: THREE.Mesh }[] = [];
+let physicsWorld: AmmoWorld;
+let tmpTrans: AmmoTransform;
+const bodies: { body: AmmoRigidBody; mesh: THREE.Mesh }[] = [];
 
-let ballBody: any;
+let ballBody: AmmoRigidBody;
 let ballMesh: THREE.Mesh;
 
 let player: THREE.Mesh;
@@ -50,7 +83,7 @@ let triesText: HTMLElement;
 let modeText: HTMLElement;
 
 // Movement keys
-let keys: Record<string, boolean> = {};
+const keys: Record<string, boolean> = {};
 
 // Start the game
 function start() {
@@ -356,10 +389,18 @@ function checkWin() {
 
 // Bootstrap Ammo and start
 function waitForAmmo() {
-  if ((window as any).Ammo) {
-    const lib = (window as any).Ammo;
-    typeof lib === "function" ? lib().then(start) : start();
-  } else setTimeout(waitForAmmo, 100);
+  const w = window as unknown as {
+    Ammo?: typeof Ammo | (() => Promise<unknown>);
+  };
+  if (w.Ammo) {
+    if (typeof w.Ammo === "function") {
+      w.Ammo().then(start);
+    } else {
+      start();
+    }
+  } else {
+    setTimeout(waitForAmmo, 100);
+  }
 }
 waitForAmmo();
 
