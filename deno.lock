@@ -375,6 +375,14 @@
       "bin": true
     }
   },
+  "redirects": {
+    "https://esm.sh/@types/three@~0.181.0/examples/jsm/controls/OrbitControls.d.ts": "https://esm.sh/@types/three@0.181.0/examples/jsm/controls/OrbitControls.d.ts",
+    "https://esm.sh/@types/three@~0.181.0/index.d.ts": "https://esm.sh/@types/three@0.181.0/index.d.ts"
+  },
+  "remote": {
+    "https://esm.sh/three@0.181.2": "9864cf2077ac5fd0c7f4c86793a37fe9a62db1850d4504f4d77b1f044d7a94b9",
+    "https://esm.sh/three@0.181.2/examples/jsm/controls/OrbitControls.js": "4363e1673ebf41fccdb6d04677072a4e16459098445ce991e78968285195ba00"
+  },
   "workspace": {
     "dependencies": [
       "npm:three@~0.181.2",

@@ -68,41 +68,6 @@ const POWER_MAX = 100;
 const POWER_RATE = 40;
 const OVERPOWER = 85;
 
-// Theme system
-// Responds to the host environment's light/dark preference using
-// the prefers-color-scheme media query, and applies it deeply to
-// sky, fog, lighting, platforms, and UI.
-type ThemeName = "light" | "dark";
-
-const THEME_CONFIG: Record<
-  ThemeName,
-  { skyColor: number; platformColor: number }
-> = {
-  light: {
-    // Daytime blue sky
-    skyColor: 0x5daeff,
-    // Light green platforms / walls
-    platformColor: 0xa6e3a1,
-  },
-  dark: {
-    // Night-time dark blue sky
-    skyColor: 0x001b3d,
-    // Dark gray platforms / walls
-    platformColor: 0x333333,
-  },
-};
-
-function getPreferredTheme(): ThemeName {
-  if (typeof window !== "undefined" && window.matchMedia) {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-  }
-  return "dark";
-}
-
-let currentTheme: ThemeName = getPreferredTheme();
-
 let HOLE = { x: 0, z: 0 };
 
 let power = 0;
@@ -119,13 +84,79 @@ let powerFill: HTMLElement;
 let triesText: HTMLElement;
 let modeText: HTMLElement;
 let interactPrompt: HTMLElement;
-let themeButton: HTMLButtonElement;
+// ===== OS Light / Dark Mode Support =====
+const colorScheme = globalThis.matchMedia("(prefers-color-scheme: dark)");
+let isDarkMode = colorScheme.matches;
+
+function applyTheme(dark: boolean) {
+  if (!scene) return;
+
+  if (dark) {
+    scene.background = new THREE.Color(0x0d0d0d);
+    scene.fog = new THREE.Fog(0x0d0d0d, 30, 120);
+    setLights(0.25, 0.8);
+
+    document.body.style.backgroundColor = "#0d0d0d";
+    triesText.style.color = "white";
+    modeText.style.color = "white";
+    interactPrompt.style.backgroundColor = "rgba(0,0,0,0.7)";
+  } else {
+    scene.background = new THREE.Color(0xf0f0f0);
+    scene.fog = new THREE.Fog(0xf0f0f0, 40, 180);
+    setLights(0.6, 1.2);
+
+    document.body.style.backgroundColor = "#f0f0f0";
+    triesText.style.color = "black";
+    modeText.style.color = "black";
+    interactPrompt.style.backgroundColor = "rgba(255,255,255,0.85)";
+  }
+
+  updateWorldMaterials(dark);
+}
+
+function setLights(ambientIntensity: number, sunIntensity: number) {
+  for (let i = scene.children.length - 1; i >= 0; i--) {
+    const obj = scene.children[i];
+    if (obj instanceof THREE.Light) {
+      scene.remove(obj);
+    }
+  }
+
+  const ambient = new THREE.AmbientLight(0xffffff, ambientIntensity);
+  const sun = new THREE.DirectionalLight(0xffffff, sunIntensity);
+  sun.position.set(20, 20, 20);
+  sun.castShadow = true;
+
+  scene.add(ambient);
+  scene.add(sun);
+}
+
+function updateWorldMaterials(dark: boolean) {
+  scene.traverse((obj) => {
+    if ((obj as THREE.Mesh).isMesh) {
+      const mesh = obj as THREE.Mesh;
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      if (!mat || !mat.color) return;
+
+      mat.roughness = dark ? 0.9 : 0.5;
+      mat.color.offsetHSL(0, 0, dark ? -0.25 : 0.25);
+      mat.needsUpdate = true;
+    }
+  });
+}
+
+// Live response to OS switch
+colorScheme.addEventListener("change", (e) => {
+  isDarkMode = e.matches;
+  applyTheme(isDarkMode);
+});
 
 // Movement keys
 const keys: Record<string, boolean> = {};
 
 // Start the game
 function start() {
+  applyTheme(isDarkMode);
   initScene();
   initPhysics();
   initUI();
@@ -134,100 +165,11 @@ function start() {
   animate();
 }
 
-// Apply theme to scene background/fog
-function applyThemeBackground() {
-  const cfg = THEME_CONFIG[currentTheme];
-  scene.background = new THREE.Color(cfg.skyColor);
-  scene.fog = new THREE.Fog(cfg.skyColor, 50, 100);
-}
-
-// Recolor non-interactable platforms/walls
-function applyThemeToPlatforms() {
-  const cfg = THEME_CONFIG[currentTheme];
-  scene.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-    if (!(mesh as any).isPlatform) return;
-    const mat = mesh.material as THREE.MeshStandardMaterial | THREE.Material;
-    if (!mat || !(mat as any).color) return;
-    (mat as THREE.MeshStandardMaterial).color.setHex(cfg.platformColor);
-  });
-}
-
-// Adjust lighting for day/night feeling
-function applyThemeLighting() {
-  const isDark = currentTheme === "dark";
-
-  scene.traverse((obj) => {
-    if (obj instanceof THREE.AmbientLight) {
-      obj.intensity = isDark ? 0.35 : 0.6;
-      obj.color.setHex(isDark ? 0xb0c4ff : 0xffffff);
-    }
-    if (obj instanceof THREE.DirectionalLight) {
-      obj.intensity = isDark ? 0.8 : 1.2;
-      obj.color.setHex(isDark ? 0xdde6ff : 0xffffff);
-    }
-  });
-}
-
-// Theme-aware UI colors
-function applyThemeToUI() {
-  if (!triesText || !modeText || !interactPrompt || !themeButton) return;
-
-  const isDark = currentTheme === "dark";
-  const fg = isDark ? "#ffffff" : "#111111";
-  const promptBg = isDark ? "rgba(0, 0, 0, 0.7)" : "rgba(255, 255, 255, 0.85)";
-
-  triesText.style.color = fg;
-  modeText.style.color = fg;
-  interactPrompt.style.color = fg;
-  interactPrompt.style.backgroundColor = promptBg;
-
-  themeButton.style.backgroundColor = isDark ? "#444444" : "#e0e0e0";
-  themeButton.style.color = isDark ? "#ffffff" : "#111111";
-}
-
-// Sync all visuals to current theme
-function syncThemeVisuals() {
-  if (themeButton) {
-    themeButton.textContent = currentTheme === "dark"
-      ? "Dark Mode"
-      : "Light Mode";
-  }
-  applyThemeBackground();
-  applyThemeToPlatforms();
-  applyThemeLighting();
-  applyThemeToUI();
-}
-
-// Watch system-level theme changes
-function setupSystemThemeWatcher() {
-  if (typeof window === "undefined" || !window.matchMedia) return;
-  const mql = window.matchMedia("(prefers-color-scheme: dark)");
-
-  const listener = (e: any) => {
-    currentTheme = e.matches ? "dark" : "light";
-    syncThemeVisuals();
-  };
-
-  // React to live changes in OS/browser theme
-  if (mql.addEventListener) {
-    mql.addEventListener("change", listener);
-  } else if (mql.addListener) {
-    // Older browsers
-    mql.addListener(listener);
-  }
-}
-
-// Toggle theme via in-game button (optional override)
-function toggleTheme() {
-  currentTheme = currentTheme === "dark" ? "light" : "dark";
-  syncThemeVisuals();
-}
-
-// Scene initialization
+// Scene initalization
 function initScene() {
   scene = new THREE.Scene();
-  applyThemeBackground();
+  scene.background = new THREE.Color(0x1a1a1a);
+  scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
 
   camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
   camera.position.set(0, 10, 20);
@@ -237,13 +179,11 @@ function initScene() {
   renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  // Base lights; actual color/intensity will be themed
   scene.add(new THREE.AmbientLight(0xffffff, 0.4));
   const sun = new THREE.DirectionalLight(0xffffff, 1);
   sun.position.set(20, 20, 20);
   sun.castShadow = true;
   scene.add(sun);
-  applyThemeLighting();
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -257,7 +197,7 @@ function initScene() {
   });
 }
 
-// Physics initialization
+// Physics initalization
 function initPhysics() {
   const cfg = new Ammo.btDefaultCollisionConfiguration();
   const dispatcher = new Ammo.btCollisionDispatcher(cfg);
@@ -275,7 +215,7 @@ function initPhysics() {
   tmpTrans = new Ammo.btTransform();
 }
 
-// UI initialization
+// UI initalization
 function initUI() {
   const bar = document.createElement("div");
   bar.id = "power-ui";
@@ -289,6 +229,7 @@ function initUI() {
   triesEl.style.position = "fixed";
   triesEl.style.top = "20px";
   triesEl.style.right = "20px";
+  triesEl.style.color = "white";
   triesEl.style.fontSize = "20px";
   document.body.appendChild(triesEl);
 
@@ -296,6 +237,7 @@ function initUI() {
   modeEl.style.position = "fixed";
   modeEl.style.bottom = "20px";
   modeEl.style.right = "20px";
+  modeEl.style.color = "white";
   modeEl.style.fontSize = "18px";
   document.body.appendChild(modeEl);
 
@@ -304,28 +246,14 @@ function initUI() {
   promptEl.style.bottom = "50%";
   promptEl.style.left = "50%";
   promptEl.style.transform = "translate(-50%, 50%)";
+  promptEl.style.color = "white";
   promptEl.style.fontSize = "24px";
+  promptEl.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
   promptEl.style.padding = "15px 30px";
   promptEl.style.borderRadius = "10px";
   promptEl.style.display = "none";
   promptEl.textContent = "Press E to interact";
   document.body.appendChild(promptEl);
-
-  // Theme toggle button (top right)
-  themeButton = document.createElement("button");
-  themeButton.textContent = currentTheme === "dark"
-    ? "Dark Mode"
-    : "Light Mode";
-  themeButton.style.position = "fixed";
-  themeButton.style.top = "60px";
-  themeButton.style.right = "20px";
-  themeButton.style.padding = "6px 12px";
-  themeButton.style.borderRadius = "6px";
-  themeButton.style.border = "none";
-  themeButton.style.cursor = "pointer";
-  themeButton.style.fontSize = "14px";
-  themeButton.onclick = toggleTheme;
-  document.body.appendChild(themeButton);
 
   powerFill = fill;
   triesText = triesEl;
@@ -336,11 +264,6 @@ function initUI() {
   triesText.style.display = "block";
   modeText.style.display = "none";
 
-  // Apply current theme to UI and set text colors
-  syncThemeVisuals();
-  // Watch for OS/browser theme changes
-  setupSystemThemeWatcher();
-
   // Initial UI update
   updateUI();
 }
@@ -349,9 +272,7 @@ function initUI() {
 function updateUI() {
   powerFill.style.height = `${(power / POWER_MAX) * 100}%`;
   triesText.textContent = `Tries: ${tries}`;
-  if (!modeText.textContent) {
-    modeText.textContent = "Mode: NORMAL";
-  }
+  modeText.textContent ||= "Mode: NORMAL";
 }
 
 // Input binding
@@ -386,8 +307,8 @@ function bindInput() {
     }
   });
 
-  addEventListener("keydown", (e) => (keys[e.code] = true));
-  addEventListener("keyup", (e) => (keys[e.code] = false));
+  addEventListener("keydown", (e) => keys[e.code] = true);
+  addEventListener("keyup", (e) => keys[e.code] = false);
 }
 
 // Player movement
@@ -654,7 +575,7 @@ function shoot() {
 
   const side = new THREE.Vector3(-dir.z, 0, dir.x);
   const lateral = overcharged
-    ? Math.random() * 2 * (Math.random() < 0.5 ? -1 : 1)
+    ? (Math.random() * 2) * (Math.random() < 0.5 ? -1 : 1)
     : 0;
   const strength = (power / POWER_MAX) * 120 * powerMultiplier;
 
@@ -724,7 +645,7 @@ function animate() {
 // Win condition
 function checkWin() {
   const dx = ballMesh.position.x - HOLE.x;
-  const dz = ballMesh.position.z - -HOLE.z;
+  const dz = ballMesh.position.z - (-HOLE.z);
 
   if (Math.sqrt(dx * dx + dz * dz) < 2.5 && ballMesh.position.y < -2) {
     alert("🎉 You Win!");
@@ -751,6 +672,7 @@ waitForAmmo();
 
 // World 0: Starting Room
 function _createWorld0() {
+  applyTheme(isDarkMode);
   // Update UI for World 0
   triesText.style.display = "block";
   updateUI();
@@ -772,9 +694,8 @@ function _createWorld0() {
   const groundThickness = 0.1;
   const groundGeo = new THREE.BoxGeometry(32, groundThickness, 32);
 
-  const platformColor = THEME_CONFIG[currentTheme].platformColor;
   const groundMat = new THREE.MeshStandardMaterial({
-    color: platformColor,
+    color: 0xFFFFFF,
     roughness: 0.6,
   });
 
@@ -782,7 +703,6 @@ function _createWorld0() {
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.position.y = -groundThickness / 2;
   ground.receiveShadow = true;
-  (ground as any).isPlatform = true;
   scene.add(ground);
 
   // Items
@@ -813,7 +733,7 @@ function _createWorld0() {
   const wallHeight = 2.5;
   const wallThickness = 0.3;
   const wallMaterial = new THREE.MeshStandardMaterial({
-    color: platformColor,
+    color: 0x333333,
     roughness: 0.7,
   });
 
@@ -821,32 +741,28 @@ function _createWorld0() {
   const frontWall = new THREE.Mesh(frontWallGeo, wallMaterial);
   frontWall.position.set(0, wallHeight / 2, -16);
   frontWall.castShadow = true;
-  (frontWall as any).isPlatform = true;
   scene.add(frontWall);
 
   const backWall = frontWall.clone();
   backWall.position.set(0, wallHeight / 2, 16);
-  (backWall as any).isPlatform = true;
   scene.add(backWall);
 
   const sideWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, 32);
   const leftWall = new THREE.Mesh(sideWallGeo, wallMaterial);
   leftWall.position.set(-16, wallHeight / 2, 0);
   leftWall.castShadow = true;
-  (leftWall as any).isPlatform = true;
   scene.add(leftWall);
 
   const rightWall = leftWall.clone();
   rightWall.position.set(16, wallHeight / 2, 0);
-  (rightWall as any).isPlatform = true;
   scene.add(rightWall);
 }
 
 // World 1: Second Room
 function _createWorld1() {
-  applyThemeBackground();
+  scene.background = new THREE.Color(0x1a1a1a);
+  scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
   addDefaultLights();
-  applyThemeLighting();
 
   // Update UI for World 1
   triesText.style.display = "block";
@@ -855,7 +771,7 @@ function _createWorld1() {
   const size = 8;
   const triggerGeo = new THREE.PlaneGeometry(size, size);
   const triggerMat = new THREE.MeshStandardMaterial({
-    color: 0xee4b2b,
+    color: 0xEE4B2B,
     transparent: true,
     opacity: 0.3,
     side: THREE.DoubleSide,
@@ -869,9 +785,8 @@ function _createWorld1() {
   const groundThickness = 0.1;
   const groundGeo = new THREE.BoxGeometry(32, groundThickness, 32);
 
-  const platformColor = THEME_CONFIG[currentTheme].platformColor;
   const groundMat = new THREE.MeshStandardMaterial({
-    color: platformColor,
+    color: 0xFFFFFF,
     roughness: 0.6,
   });
 
@@ -879,7 +794,6 @@ function _createWorld1() {
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.position.y = -groundThickness / 2;
   ground.receiveShadow = true;
-  (ground as any).isPlatform = true;
   scene.add(ground);
 
   // Items
@@ -909,7 +823,7 @@ function _createWorld1() {
   const wallHeight = 2.5;
   const wallThickness = 0.3;
   const wallMaterial = new THREE.MeshStandardMaterial({
-    color: platformColor,
+    color: 0x333333,
     roughness: 0.7,
   });
 
@@ -917,36 +831,32 @@ function _createWorld1() {
   const frontWall = new THREE.Mesh(frontWallGeo, wallMaterial);
   frontWall.position.set(0, wallHeight / 2, -16);
   frontWall.castShadow = true;
-  (frontWall as any).isPlatform = true;
   scene.add(frontWall);
 
   const backWall = frontWall.clone();
   backWall.position.set(0, wallHeight / 2, 16);
-  (backWall as any).isPlatform = true;
   scene.add(backWall);
 
   const sideWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, 32);
   const leftWall = new THREE.Mesh(sideWallGeo, wallMaterial);
   leftWall.position.set(-16, wallHeight / 2, 0);
   leftWall.castShadow = true;
-  (leftWall as any).isPlatform = true;
   scene.add(leftWall);
 
   const rightWall = leftWall.clone();
   rightWall.position.set(16, wallHeight / 2, 0);
-  (rightWall as any).isPlatform = true;
   scene.add(rightWall);
 }
 
 // World 2: Golf Game
 function startWorld2() {
+  applyTheme(isDarkMode);
   world2Started = true;
   clearScene();
   clearPhysics();
   addDefaultLights();
-  applyThemeBackground();
-  applyThemeLighting();
-  syncThemeVisuals();
+  scene.background = new THREE.Color(0x1a1a1a);
+  scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
 
   powerFill.style.display = "block";
   triesText.style.display = "block";
@@ -982,71 +892,41 @@ function _createWorld2() {
   // Walls
   const restitution = 1.1;
 
-  const platformColor = THEME_CONFIG[currentTheme].platformColor;
-
-  const wall1 = createBox(
+  createBox(
     { width: 1, height: 2, depth: 32 },
     { x: 4.5, z: 0 },
     scene,
     physicsWorld,
     0.5,
     restitution,
-  ) as { mesh?: THREE.Mesh } | void;
+  );
 
-  if (wall1 && wall1.mesh) {
-    (wall1.mesh.material as THREE.MeshStandardMaterial).color.setHex(
-      platformColor,
-    );
-    (wall1.mesh as any).isPlatform = true;
-  }
-
-  const wall2 = createBox(
+  createBox(
     { width: 1, height: 2, depth: 32 },
     { x: -4.5, z: 0 },
     scene,
     physicsWorld,
     0.5,
     restitution,
-  ) as { mesh?: THREE.Mesh } | void;
+  );
 
-  if (wall2 && wall2.mesh) {
-    (wall2.mesh.material as THREE.MeshStandardMaterial).color.setHex(
-      platformColor,
-    );
-    (wall2.mesh as any).isPlatform = true;
-  }
-
-  const wall3 = createBox(
+  createBox(
     { width: 10, height: 2, depth: 1 },
     { x: 0, z: -16.5 },
     scene,
     physicsWorld,
     0.5,
     restitution,
-  ) as { mesh?: THREE.Mesh } | void;
+  );
 
-  if (wall3 && wall3.mesh) {
-    (wall3.mesh.material as THREE.MeshStandardMaterial).color.setHex(
-      platformColor,
-    );
-    (wall3.mesh as any).isPlatform = true;
-  }
-
-  const wall4 = createBox(
+  createBox(
     { width: 10, height: 2, depth: 1 },
     { x: 0, z: 16.5 },
     scene,
     physicsWorld,
     0.5,
     restitution,
-  ) as { mesh?: THREE.Mesh } | void;
-
-  if (wall4 && wall4.mesh) {
-    (wall4.mesh.material as THREE.MeshStandardMaterial).color.setHex(
-      platformColor,
-    );
-    (wall4.mesh as any).isPlatform = true;
-  }
+  );
 
   // Friction
   ballBody.setFriction(2.5);
