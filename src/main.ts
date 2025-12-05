@@ -69,6 +69,9 @@ const POWER_RATE = 40;
 const OVERPOWER = 85;
 
 // Theme system
+// Responds to the host environment's light/dark preference using
+// the prefers-color-scheme media query, and applies it deeply to
+// sky, fog, lighting, platforms, and UI.
 type ThemeName = "light" | "dark";
 
 const THEME_CONFIG: Record<
@@ -76,20 +79,29 @@ const THEME_CONFIG: Record<
   { skyColor: number; platformColor: number }
 > = {
   light: {
-    // Blue sky
+    // Daytime blue sky
     skyColor: 0x5daeff,
-    // Light green for non-interactable platforms / walls
+    // Light green platforms / walls
     platformColor: 0xa6e3a1,
   },
   dark: {
-    // Dark blue sky
+    // Night-time dark blue sky
     skyColor: 0x001b3d,
-    // Gray platforms/walls (as before)
+    // Dark gray platforms / walls
     platformColor: 0x333333,
   },
 };
 
-let currentTheme: ThemeName = "dark";
+function getPreferredTheme(): ThemeName {
+  if (typeof window !== "undefined" && window.matchMedia) {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }
+  return "dark";
+}
+
+let currentTheme: ThemeName = getPreferredTheme();
 
 let HOLE = { x: 0, z: 0 };
 
@@ -141,16 +153,78 @@ function applyThemeToPlatforms() {
   });
 }
 
-// Toggle theme via button
-function toggleTheme() {
-  currentTheme = currentTheme === "dark" ? "light" : "dark";
-  themeButton.textContent =
-    currentTheme === "dark" ? "Dark Mode" : "Light Mode";
-  applyThemeBackground();
-  applyThemeToPlatforms();
+// Adjust lighting for day/night feeling
+function applyThemeLighting() {
+  const isDark = currentTheme === "dark";
+
+  scene.traverse((obj) => {
+    if (obj instanceof THREE.AmbientLight) {
+      obj.intensity = isDark ? 0.35 : 0.6;
+      obj.color.setHex(isDark ? 0xb0c4ff : 0xffffff);
+    }
+    if (obj instanceof THREE.DirectionalLight) {
+      obj.intensity = isDark ? 0.8 : 1.2;
+      obj.color.setHex(isDark ? 0xdde6ff : 0xffffff);
+    }
+  });
 }
 
-// Scene initalization
+// Theme-aware UI colors
+function applyThemeToUI() {
+  if (!triesText || !modeText || !interactPrompt || !themeButton) return;
+
+  const isDark = currentTheme === "dark";
+  const fg = isDark ? "#ffffff" : "#111111";
+  const promptBg = isDark ? "rgba(0, 0, 0, 0.7)" : "rgba(255, 255, 255, 0.85)";
+
+  triesText.style.color = fg;
+  modeText.style.color = fg;
+  interactPrompt.style.color = fg;
+  interactPrompt.style.backgroundColor = promptBg;
+
+  themeButton.style.backgroundColor = isDark ? "#444444" : "#e0e0e0";
+  themeButton.style.color = isDark ? "#ffffff" : "#111111";
+}
+
+// Sync all visuals to current theme
+function syncThemeVisuals() {
+  if (themeButton) {
+    themeButton.textContent = currentTheme === "dark"
+      ? "Dark Mode"
+      : "Light Mode";
+  }
+  applyThemeBackground();
+  applyThemeToPlatforms();
+  applyThemeLighting();
+  applyThemeToUI();
+}
+
+// Watch system-level theme changes
+function setupSystemThemeWatcher() {
+  if (typeof window === "undefined" || !window.matchMedia) return;
+  const mql = window.matchMedia("(prefers-color-scheme: dark)");
+
+  const listener = (e: any) => {
+    currentTheme = e.matches ? "dark" : "light";
+    syncThemeVisuals();
+  };
+
+  // React to live changes in OS/browser theme
+  if (mql.addEventListener) {
+    mql.addEventListener("change", listener);
+  } else if (mql.addListener) {
+    // Older browsers
+    mql.addListener(listener);
+  }
+}
+
+// Toggle theme via in-game button (optional override)
+function toggleTheme() {
+  currentTheme = currentTheme === "dark" ? "light" : "dark";
+  syncThemeVisuals();
+}
+
+// Scene initialization
 function initScene() {
   scene = new THREE.Scene();
   applyThemeBackground();
@@ -163,11 +237,13 @@ function initScene() {
   renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
+  // Base lights; actual color/intensity will be themed
   scene.add(new THREE.AmbientLight(0xffffff, 0.4));
   const sun = new THREE.DirectionalLight(0xffffff, 1);
   sun.position.set(20, 20, 20);
   sun.castShadow = true;
   scene.add(sun);
+  applyThemeLighting();
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -181,7 +257,7 @@ function initScene() {
   });
 }
 
-// Physics initalization
+// Physics initialization
 function initPhysics() {
   const cfg = new Ammo.btDefaultCollisionConfiguration();
   const dispatcher = new Ammo.btCollisionDispatcher(cfg);
@@ -199,7 +275,7 @@ function initPhysics() {
   tmpTrans = new Ammo.btTransform();
 }
 
-// UI initalization
+// UI initialization
 function initUI() {
   const bar = document.createElement("div");
   bar.id = "power-ui";
@@ -213,7 +289,6 @@ function initUI() {
   triesEl.style.position = "fixed";
   triesEl.style.top = "20px";
   triesEl.style.right = "20px";
-  triesEl.style.color = "white";
   triesEl.style.fontSize = "20px";
   document.body.appendChild(triesEl);
 
@@ -221,7 +296,6 @@ function initUI() {
   modeEl.style.position = "fixed";
   modeEl.style.bottom = "20px";
   modeEl.style.right = "20px";
-  modeEl.style.color = "white";
   modeEl.style.fontSize = "18px";
   document.body.appendChild(modeEl);
 
@@ -230,9 +304,7 @@ function initUI() {
   promptEl.style.bottom = "50%";
   promptEl.style.left = "50%";
   promptEl.style.transform = "translate(-50%, 50%)";
-  promptEl.style.color = "white";
   promptEl.style.fontSize = "24px";
-  promptEl.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
   promptEl.style.padding = "15px 30px";
   promptEl.style.borderRadius = "10px";
   promptEl.style.display = "none";
@@ -241,7 +313,9 @@ function initUI() {
 
   // Theme toggle button (top right)
   themeButton = document.createElement("button");
-  themeButton.textContent = "Dark Mode";
+  themeButton.textContent = currentTheme === "dark"
+    ? "Dark Mode"
+    : "Light Mode";
   themeButton.style.position = "fixed";
   themeButton.style.top = "60px";
   themeButton.style.right = "20px";
@@ -250,8 +324,6 @@ function initUI() {
   themeButton.style.border = "none";
   themeButton.style.cursor = "pointer";
   themeButton.style.fontSize = "14px";
-  themeButton.style.backgroundColor = "#444";
-  themeButton.style.color = "#fff";
   themeButton.onclick = toggleTheme;
   document.body.appendChild(themeButton);
 
@@ -264,6 +336,11 @@ function initUI() {
   triesText.style.display = "block";
   modeText.style.display = "none";
 
+  // Apply current theme to UI and set text colors
+  syncThemeVisuals();
+  // Watch for OS/browser theme changes
+  setupSystemThemeWatcher();
+
   // Initial UI update
   updateUI();
 }
@@ -272,7 +349,9 @@ function initUI() {
 function updateUI() {
   powerFill.style.height = `${(power / POWER_MAX) * 100}%`;
   triesText.textContent = `Tries: ${tries}`;
-  modeText.textContent ||= "Mode: NORMAL";
+  if (!modeText.textContent) {
+    modeText.textContent = "Mode: NORMAL";
+  }
 }
 
 // Input binding
@@ -767,6 +846,7 @@ function _createWorld0() {
 function _createWorld1() {
   applyThemeBackground();
   addDefaultLights();
+  applyThemeLighting();
 
   // Update UI for World 1
   triesText.style.display = "block";
@@ -865,6 +945,8 @@ function startWorld2() {
   clearPhysics();
   addDefaultLights();
   applyThemeBackground();
+  applyThemeLighting();
+  syncThemeVisuals();
 
   powerFill.style.display = "block";
   triesText.style.display = "block";
