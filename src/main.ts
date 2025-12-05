@@ -84,6 +84,71 @@ let powerFill: HTMLElement;
 let triesText: HTMLElement;
 let modeText: HTMLElement;
 let interactPrompt: HTMLElement;
+
+// ===== I18N / L10N SYSTEM =====
+type Lang = "en" | "zh" | "ar";
+
+let currentLang: Lang = "en";
+
+const i18n = {
+  en: {
+    tries: "Tries",
+    mode: "Mode",
+    weak: "WEAK",
+    strong: "STRONG",
+    interact: "Press E to interact",
+    win: "🎉 You Win!",
+    lose: "💀",
+  },
+
+  zh: {
+    tries: "次数",
+    mode: "模式",
+    weak: "弱",
+    strong: "强",
+    interact: "按 E 键互动",
+    win: "🎉 你赢了！",
+    lose: "💀",
+  },
+
+  ar: {
+    tries: "المحاولات",
+    mode: "الوضع",
+    weak: "ضعيف",
+    strong: "قوي",
+    interact: "اضغط E للتفاعل",
+    win: "🎉 فزت!",
+    lose: "💀",
+  },
+};
+
+function t(key: keyof typeof i18n["en"]): string {
+  return i18n[currentLang][key];
+}
+
+function setLanguage(lang: Lang) {
+  currentLang = lang;
+  interactPrompt.textContent = t("interact");
+  updateUI();
+  applyLanguageLayout(lang);
+}
+
+function applyLanguageLayout(lang: Lang) {
+  if (lang === "ar") {
+    document.body.dir = "rtl";
+    triesText.style.right = "auto";
+    triesText.style.left = "20px";
+    modeText.style.right = "auto";
+    modeText.style.left = "20px";
+  } else {
+    document.body.dir = "ltr";
+    triesText.style.left = "auto";
+    triesText.style.right = "20px";
+    modeText.style.left = "auto";
+    modeText.style.right = "20px";
+  }
+}
+
 // ===== OS Light / Dark Mode Support =====
 const colorScheme = globalThis.matchMedia("(prefers-color-scheme: dark)");
 let isDarkMode = colorScheme.matches;
@@ -252,7 +317,7 @@ function initUI() {
   promptEl.style.padding = "15px 30px";
   promptEl.style.borderRadius = "10px";
   promptEl.style.display = "none";
-  promptEl.textContent = "Press E to interact";
+  promptEl.textContent = t("interact");
   document.body.appendChild(promptEl);
 
   powerFill = fill;
@@ -271,44 +336,53 @@ function initUI() {
 // Update UI elements
 function updateUI() {
   powerFill.style.height = `${(power / POWER_MAX) * 100}%`;
-  triesText.textContent = `Tries: ${tries}`;
-  modeText.textContent ||= "Mode: NORMAL";
+  triesText.textContent = `${t("tries")}: ${tries}`;
+  modeText.textContent ||= `${t("mode")}: NORMAL`;
 }
 
 // Input binding
 function bindInput() {
+  // Key DOWN
   addEventListener("keydown", (e) => {
-    const k = e.code;
-    if (!world1Started) {
-      return;
-    }
+    // ----- Language switching (always allowed) -----
+    if (e.code === "Digit7") setLanguage("en");
+    if (e.code === "Digit8") setLanguage("zh");
+    if (e.code === "Digit9") setLanguage("ar");
 
+    const k = e.code;
+
+    // ----- Movement input always tracked -----
+    keys[k] = true;
+
+    // ----- Do NOT block language switching -----
+    if (!world1Started) return;
+
+    // ----- Gameplay controls -----
     if (k === "Space" && canShoot()) {
       charging = true;
     }
 
     if (k === "Digit1") {
       powerMultiplier = WEAK;
-      modeText.textContent = "Mode: WEAK";
+      modeText.textContent = `${t("mode")}: ${t("weak")}`;
     }
 
     if (k === "Digit2") {
       powerMultiplier = STRONG;
-      modeText.textContent = "Mode: STRONG";
+      modeText.textContent = `${t("mode")}: ${t("strong")}`;
     }
   });
 
+  // Key UP
   addEventListener("keyup", (e) => {
-    if (!world2Started) {
-      return;
-    }
+    keys[e.code] = false;
+
+    if (!world2Started) return;
+
     if (e.code === "Space") {
       shoot();
     }
   });
-
-  addEventListener("keydown", (e) => keys[e.code] = true);
-  addEventListener("keyup", (e) => keys[e.code] = false);
 }
 
 // Player movement
@@ -539,7 +613,7 @@ function checkStartWorld2Trigger() {
 
   if (dx * dx + dz * dz < WORLD2_TRIGGER.size * WORLD2_TRIGGER.size) {
     if (inventory === 0) {
-      alert("💀");
+      alert(t("lose"));
       location.reload();
     } else {
       startWorld2();
@@ -648,7 +722,7 @@ function checkWin() {
   const dz = ballMesh.position.z - (-HOLE.z);
 
   if (Math.sqrt(dx * dx + dz * dz) < 2.5 && ballMesh.position.y < -2) {
-    alert("🎉 You Win!");
+    alert(t("win"));
     gameEnded = true;
   }
 }
