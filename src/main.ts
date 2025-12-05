@@ -233,8 +233,8 @@ function start() {
 // Scene initalization
 function initScene() {
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1a1a);
-  scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
+  // scene.background = new THREE.Color(0x1a1a1a);
+  // scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
 
   camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
   camera.position.set(0, 10, 20);
@@ -746,7 +746,6 @@ waitForAmmo();
 
 // World 0: Starting Room
 function _createWorld0() {
-  applyTheme(isDarkMode);
   // Update UI for World 0
   triesText.style.display = "block";
   updateUI();
@@ -807,8 +806,8 @@ function _createWorld0() {
   const wallHeight = 2.5;
   const wallThickness = 0.3;
   const wallMaterial = new THREE.MeshStandardMaterial({
-    color: 0x333333,
-    roughness: 0.7,
+    color: isDarkMode ? 0x333333 : 0xdddddd,
+    roughness: isDarkMode ? 0.8 : 0.4,
   });
 
   const frontWallGeo = new THREE.BoxGeometry(32, wallHeight, wallThickness);
@@ -830,12 +829,13 @@ function _createWorld0() {
   const rightWall = leftWall.clone();
   rightWall.position.set(16, wallHeight / 2, 0);
   scene.add(rightWall);
+  applyTheme(isDarkMode);
 }
 
 // World 1: Second Room
 function _createWorld1() {
-  scene.background = new THREE.Color(0x1a1a1a);
-  scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
+  // scene.background = new THREE.Color(0x1a1a1a);
+  // scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
   addDefaultLights();
 
   // Update UI for World 1
@@ -897,8 +897,8 @@ function _createWorld1() {
   const wallHeight = 2.5;
   const wallThickness = 0.3;
   const wallMaterial = new THREE.MeshStandardMaterial({
-    color: 0x333333,
-    roughness: 0.7,
+    color: isDarkMode ? 0x333333 : 0xdddddd,
+    roughness: isDarkMode ? 0.8 : 0.4,
   });
 
   const frontWallGeo = new THREE.BoxGeometry(32, wallHeight, wallThickness);
@@ -924,13 +924,12 @@ function _createWorld1() {
 
 // World 2: Golf Game
 function startWorld2() {
-  applyTheme(isDarkMode);
   world2Started = true;
   clearScene();
   clearPhysics();
   addDefaultLights();
-  scene.background = new THREE.Color(0x1a1a1a);
-  scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
+  // scene.background = new THREE.Color(0x1a1a1a);
+  // scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
 
   powerFill.style.display = "block";
   triesText.style.display = "block";
@@ -938,6 +937,7 @@ function startWorld2() {
 
   _createWorld2();
   updateUI();
+  applyTheme(isDarkMode);
 }
 
 function _createWorld2() {
