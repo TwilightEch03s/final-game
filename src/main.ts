@@ -59,8 +59,8 @@ let player: THREE.Mesh;
 let world0Complete: boolean = false;
 let world1Complete: boolean = false;
 let gameEnded = false;
-let tries: number = 0;
-let inventory = 0;
+let tries: number = 1;
+let inventory = 1;
 
 // Constants
 const GRAVITY = -50;
@@ -157,7 +157,7 @@ function applyTheme(dark: boolean) {
   if (!scene) return;
 
   if (dark) {
-    scene.background = new THREE.Color(0x0d0d0d);
+    scene.background = new THREE.Color(0x3d3d3d);
     scene.fog = new THREE.Fog(0x0d0d0d, 30, 120);
     setLights(0.25, 0.8);
 
@@ -825,6 +825,42 @@ function waitForAmmo() {
 }
 waitForAmmo();
 
+// Clear physics bodies
+function clearPhysics() {
+  if (!physicsWorld) {
+    return;
+  }
+
+  for (let i = bodies.length - 1; i >= 0; i--) {
+    const { body } = bodies[i];
+
+    physicsWorld.removeRigidBody(body);
+    Ammo.destroy(body);
+
+    bodies.splice(i, 1);
+  }
+}
+
+// Add default lights
+function addDefaultLights() {
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+
+  const sun = new THREE.DirectionalLight(0xffffff, 1);
+  sun.position.set(20, 20, 20);
+  sun.castShadow = true;
+  scene.add(sun);
+}
+
+// Clear scene and physics for world switch
+function clearScene() {
+  while (scene.children.length > 0) {
+    const obj = scene.children.pop();
+    if (obj) {
+      scene.remove(obj);
+    }
+  }
+}
+
 // World 0: Starting Room
 function _createWorld0() {
   // Update UI for World 0
@@ -1026,7 +1062,7 @@ function _createWorld2() {
   tries = inventory;
   HOLE = { x: 0, z: 11 };
 
-  const ballSpawn = { x: 0, y: 2, z: 12 };
+  const ballSpawn = { x: 0, y: 2, z: 14 };
 
   // Hole
   createHole(
@@ -1045,7 +1081,7 @@ function _createWorld2() {
   ballMesh = ball.mesh;
   ballBody = ball.body;
 
-  // Walls
+  // Box Walls
   const restitution = 1.1;
 
   createBox(
@@ -1059,7 +1095,52 @@ function _createWorld2() {
 
   createBox(
     { width: 1, height: 2, depth: 32 },
-    { x: -4.5, z: 0 },
+    { x: -12.5, z: 0 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+
+  createBox(
+    { width: 1, height: 10, depth: 24 },
+    { x: -4.5, z: -5 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+
+  createBox(
+    { width: 1, height: 10, depth: 24 },
+    { x: -12.5, z: -5 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+
+  createBox(
+    { width: 10, height: 10, depth: 1 },
+    { x: 0, z: -16.5 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+
+  createBox( // back wall
+    { width: 26, height: 20, depth: 1 },
+    { x: 0, z: -27.5 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+
+  createBox(
+    { width: 8, height: 10, depth: 1 },
+    { x: 8, z: -3 },
     scene,
     physicsWorld,
     0.5,
@@ -1068,7 +1149,7 @@ function _createWorld2() {
 
   createBox(
     { width: 10, height: 2, depth: 1 },
-    { x: 0, z: -16.5 },
+    { x: 0, z: -6 },
     scene,
     physicsWorld,
     0.5,
@@ -1082,6 +1163,132 @@ function _createWorld2() {
     physicsWorld,
     0.5,
     restitution,
+  );
+
+  createBox(
+    { width: 18, height: 2, depth: 1 },
+    { x: -4, z: 16.5 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+
+  createBox(
+    { width: 1, height: 7.25, depth: 13 },
+    { x: 4.5, z: -10 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+
+  createBox(
+    { width: 1, height: 10, depth: 14.5 },
+    { x: 12.5, z: -9.75 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+
+  createBox(
+    { width: 1, height: 20, depth: 10 },
+    { x: 12.5, z: -22 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+
+  createBox(
+    { width: 1, height: 20, depth: 10 },
+    { x: -12.5, z: -22 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+
+  // Box Platforms
+
+  createBox(
+    { width: 9, height: 0, depth: 10 },
+    { x: -8.5, z: 11 },
+    scene,
+    physicsWorld,
+    0.001,
+    restitution,
+    0,
+    0xA9A9A9,
+  );
+
+  createBox( // ramp
+    { width: 9, height: 0, depth: 10 },
+    { x: -8.5, z: 1.75 },
+    scene,
+    physicsWorld,
+    2,
+    0,
+    25,
+    0xA9A9A9,
+  );
+
+  createBox(
+    { width: 9, height: 0, depth: 14.25 },
+    { x: -8.5, z: -9.9 },
+    scene,
+    physicsWorld,
+    4.1,
+    restitution,
+    0,
+    0xA9A9A9,
+  );
+
+  createBox(
+    { width: 26, height: 0, depth: 10 },
+    { x: 0, z: -22 },
+    scene,
+    physicsWorld,
+    4.1,
+    restitution,
+    0,
+    0xA9A9A9,
+  );
+
+  createBox(
+    { width: 9, height: 0, depth: 14.25 },
+    { x: 8.5, z: -9.9 },
+    scene,
+    physicsWorld,
+    4.1,
+    restitution,
+    0,
+    0xA9A9A9,
+  );
+
+  // Box Other
+
+  createBox(
+    { width: 2, height: 1, depth: 2 },
+    { x: 4.5, z: -22 },
+    scene,
+    physicsWorld,
+    4.5,
+    4,
+    0,
+    0xFF0000,
+  );
+
+  createBox(
+    { width: 2, height: 1, depth: 2 },
+    { x: -4.5, z: -22 },
+    scene,
+    physicsWorld,
+    4.5,
+    4,
+    0,
+    0xFF0000,
   );
 
   // Friction
@@ -1159,20 +1366,43 @@ function clearPhysics() {
 
   for (let i = bodies.length - 1; i >= 0; i--) {
     const { body } = bodies[i];
+/* Tutorial Level (Unused)
+// Walls
+  const restitution = 1.1;
 
-    physicsWorld.removeRigidBody(body);
-    Ammo.destroy(body);
+  createBox(
+    { width: 1, height: 2, depth: 32 },
+    { x: 4.5, z: 0 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
 
-    bodies.splice(i, 1);
-  }
-}
+  createBox(
+    { width: 1, height: 2, depth: 32 },
+    { x: -4.5, z: 0 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
 
-// Add default lights
-function addDefaultLights() {
-  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+  createBox(
+    { width: 10, height: 2, depth: 1 },
+    { x: 0, z: -16.5 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
 
-  const sun = new THREE.DirectionalLight(0xffffff, 1);
-  sun.position.set(20, 20, 20);
-  sun.castShadow = true;
-  scene.add(sun);
-}
+  createBox(
+    { width: 10, height: 2, depth: 1 },
+    { x: 0, z: 16.5 },
+    scene,
+    physicsWorld,
+    0.5,
+    restitution,
+  );
+*/
