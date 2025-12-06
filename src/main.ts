@@ -790,6 +790,24 @@ function animate() {
     }
   });
 
+  // Rotate bomb fuse based on ball velocity (rolling effect)
+  if (ballMesh && ballBody && world1Complete) {
+    const vel = ballBody.getLinearVelocity();
+    const speed = Math.sqrt(vel.x() ** 2 + vel.z() ** 2);
+
+    // Rotate the entire bomb mesh based on velocity direction
+    if (speed > 0.1) {
+      const rotationSpeed = speed * 2;
+      const velDir = new THREE.Vector2(vel.x(), vel.z()).normalize();
+
+      // Rotate around axis perpendicular to movement
+      ballMesh.rotateOnAxis(
+        new THREE.Vector3(-velDir.y, 0, velDir.x),
+        rotationSpeed * dt,
+      );
+    }
+  }
+
   if (!world1Complete) {
     updatePlayerMovement();
   }
@@ -809,8 +827,7 @@ function animate() {
     if (tries <= 0 && !gameEnded) {
       gameEnded = true;
       setTimeout(() => {
-        alert("💀");
-        location.reload();
+        explodeBomb();
       }, 500);
     }
   }
@@ -832,6 +849,84 @@ function checkWin() {
     alert(t("win"));
     gameEnded = true;
   }
+}
+
+// Explosion effect
+function explodeBomb() {
+  if (!ballMesh) return;
+
+  // Create explosion particles
+  const particleCount = 50;
+  const particles: THREE.Mesh[] = [];
+
+  for (let i = 0; i < particleCount; i++) {
+    const size = Math.random() * 0.5 + 0.2;
+    const geo = new THREE.SphereGeometry(size, 8, 8);
+    const mat = new THREE.MeshStandardMaterial({
+      color: Math.random() > 0.5 ? 0xff4500 : 0xff8c00,
+      emissive: 0xff4500,
+      emissiveIntensity: 0.8,
+    });
+    const particle = new THREE.Mesh(geo, mat);
+
+    particle.position.copy(ballMesh.position);
+
+    // Random velocity
+    const angle = Math.random() * Math.PI * 2;
+    const elevation = Math.random() * Math.PI - Math.PI / 2;
+    const speed = Math.random() * 15 + 5;
+
+    particle.userData.velocity = new THREE.Vector3(
+      Math.cos(angle) * Math.cos(elevation) * speed,
+      Math.sin(elevation) * speed + 10,
+      Math.sin(angle) * Math.cos(elevation) * speed,
+    );
+
+    scene.add(particle);
+    particles.push(particle);
+  }
+
+  // Hide the bomb
+  ballMesh.visible = false;
+
+  // Flash effect
+  const originalBg = scene.background;
+  scene.background = new THREE.Color(0xffffff);
+
+  // Animate particles
+  let time = 0;
+  const explosionInterval = setInterval(() => {
+    time += 0.016;
+
+    particles.forEach((particle) => {
+      particle.position.add(
+        particle.userData.velocity.clone().multiplyScalar(0.016),
+      );
+      particle.userData.velocity.y -= 30 * 0.016; // Gravity
+
+      // Fade out
+      const mat = particle.material as THREE.MeshStandardMaterial;
+      mat.opacity = Math.max(0, 1 - time * 2);
+      mat.transparent = true;
+
+      // Shrink
+      particle.scale.multiplyScalar(0.98);
+    });
+
+    if (time > 0.1) {
+      scene.background = originalBg;
+    }
+
+    if (time > 1) {
+      clearInterval(explosionInterval);
+      particles.forEach((p) => scene.remove(p));
+
+      setTimeout(() => {
+        alert("💣💥");
+        location.reload();
+      }, 500);
+    }
+  }, 16);
 }
 
 // Bootstrap Ammo and start
@@ -1101,11 +1196,37 @@ function _createWorld2() {
     0,
   );
 
-  // Ball
+  // Ball (Bomb)
   const ballShape = new Ammo.btSphereShape(1);
   const ball = addBody(ballShape, 1, ballSpawn, scene, bodies, physicsWorld);
   ballMesh = ball.mesh;
   ballBody = ball.body;
+
+  // Style as a bomb
+  (ballMesh.material as THREE.MeshStandardMaterial).color.setHex(0x1a1a1a);
+  (ballMesh.material as THREE.MeshStandardMaterial).metalness = 0.3;
+  (ballMesh.material as THREE.MeshStandardMaterial).roughness = 0.7;
+
+  // Add fuse (small cylinder on top)
+  const fuseGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8);
+  const fuseMat = new THREE.MeshStandardMaterial({
+    color: 0x8b4513,
+    roughness: 0.9,
+  });
+  const fuse = new THREE.Mesh(fuseGeo, fuseMat);
+  fuse.position.set(0, 1.3, 0);
+  ballMesh.add(fuse);
+
+  // Add glowing tip to fuse
+  const tipGeo = new THREE.SphereGeometry(0.15, 8, 8);
+  const tipMat = new THREE.MeshStandardMaterial({
+    color: 0xff4500,
+    emissive: 0xff4500,
+    emissiveIntensity: 1,
+  });
+  const tip = new THREE.Mesh(tipGeo, tipMat);
+  tip.position.set(0, 1.6, 0);
+  ballMesh.add(tip);
 
   // Box Walls
   const restitution = 1.1;
