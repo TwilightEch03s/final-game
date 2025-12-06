@@ -224,7 +224,6 @@ function start() {
   applyTheme(isDarkMode);
   initScene();
   initPhysics();
-  localStorage.clear();
   loadGameData();
   initUI();
   loadWorld();
@@ -237,8 +236,16 @@ function saveGameData() {
   localStorage.world1 = world1Complete;
   localStorage.tries = tries;
   localStorage.inventory = inventory;
+  localStorage.pickedItems = JSON.stringify(pickedItems);
+
+  console.log(JSON.parse(localStorage.pickedItems));
 
   console.log(localStorage);
+}
+
+function resetGame() {
+  localStorage.clear();
+  location.reload();
 }
 
 function loadGameData() {
@@ -247,6 +254,7 @@ function loadGameData() {
   world1Complete = JSON.parse(localStorage.world1);
   tries = localStorage.tries;
   inventory = localStorage.inventory;
+  pickedItems = JSON.parse(localStorage.pickedItems);
 
   console.log(localStorage);
 }
@@ -332,6 +340,17 @@ function initUI() {
   triesEl.style.fontSize = "20px";
   document.body.appendChild(triesEl);
 
+  const instructionEl = document.createElement("div");
+  instructionEl.style.position = "fixed";
+  instructionEl.style.top = "20px";
+  instructionEl.style.left = "20px";
+  instructionEl.style.color = "white";
+  instructionEl.style.fontSize = "20px";
+  instructionEl.innerText = `Use WASD to move.  Use E to interact with blocks.\n
+  In golf mode, hold space to power up your hit and \nmove the camera to aim!\n
+  Press '5' to save the game and '6' to reset!`;
+  document.body.appendChild(instructionEl);
+
   const modeEl = document.createElement("div");
   modeEl.style.position = "fixed";
   modeEl.style.bottom = "20px";
@@ -379,6 +398,9 @@ function bindInput() {
   // Key DOWN
   addEventListener("keydown", (e) => {
     // ----- Language switching (always allowed) -----
+
+    if (e.code === "Digit5") saveGameData();
+    if (e.code === "Digit6") resetGame();
     if (e.code === "Digit7") setLanguage("en");
     if (e.code === "Digit8") setLanguage("zh");
     if (e.code === "Digit9") setLanguage("ar");
@@ -469,6 +491,7 @@ interface Item {
 }
 
 const items: Item[] = [];
+let pickedItems: Item[] = [];
 
 // Item functions
 function createItem(
@@ -476,6 +499,11 @@ function createItem(
   size = 1,
   isPhysical = false,
 ) {
+  for (const item of pickedItems) {
+    if (item.position.x == pos.x) {
+      return;
+    }
+  }
   const geo = new THREE.BoxGeometry(size, size, size);
   const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
   const mesh = new THREE.Mesh(geo, mat);
@@ -583,6 +611,7 @@ function updateItems() {
 }
 
 function pickupItem(item: Item) {
+  pickedItems.push(item);
   item.pickedUp = true;
   item.interactable = false;
 
