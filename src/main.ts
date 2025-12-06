@@ -16,19 +16,30 @@ interface AmmoTransform {
 
 interface AmmoMotionState {
   getWorldTransform(transform: AmmoTransform): void;
+  setWorldTransform(transform: unknown): void;
 }
 
 interface AmmoRigidBody {
   getMotionState(): AmmoMotionState | null;
+
+  // Velocity
   getLinearVelocity(): AmmoVector3;
+  setLinearVelocity(vec: unknown): void;
+  setAngularVelocity(vec: unknown): void;
+
+  // Activation
   activate(forceActivation?: boolean): void;
+
+  // Forces
   applyCentralImpulse(impulse: unknown): void;
+
+  // Physics properties
   setFriction(friction: number): void;
   setRollingFriction(friction: number): void;
   setDamping(linear: number, angular: number): void;
-  setWorldTransform(transform: AmmoTransform): void;
-  setLinearVelocity(velocity: unknown): void;
-  setAngularVelocity(velocity: unknown): void;
+
+  // Transform
+  setWorldTransform(transform: unknown): void;
 }
 
 interface AmmoWorld {
@@ -425,7 +436,7 @@ function bindInput() {
   addEventListener("keydown", (e) => {
     // ----- Language switching (always allowed) -----
 
-    if (e.code === "KeyU" && !world1Complete) undo();
+    if (e.code === "KeyU") undo();
     if (e.code === "Digit4") saveGameData();
     if (e.code === "Digit5") resetGame();
     if (e.code === "Digit6") setLanguage("en");
@@ -749,6 +760,13 @@ function shoot() {
   if (!charging || !ballBody || gameEnded) {
     return;
   }
+  // SAVE BALL STATE FOR UNDO
+  const pos = ballMesh.position.clone();
+  const vel = ballBody.getLinearVelocity();
+  const velVec = new THREE.Vector3(vel.x(), vel.y(), vel.z());
+  const triesBefore = tries;
+
+  undoStack.push(ballShotAction(pos, velVec, triesBefore));
 
   // Save current position before shooting
   ballPreviousPosition.copy(ballMesh.position);
@@ -1634,6 +1652,42 @@ function itemAction(item: Item): UndoAction {
       tries--;
       updateUI();
       saveGameData();
+    },
+  };
+}
+
+function ballShotAction(
+  position: THREE.Vector3,
+  velocity: THREE.Vector3,
+  triesBefore: number,
+): UndoAction {
+  return {
+    undo: () => {
+      if (!ballBody || !ballMesh) return;
+
+      // Restore tries
+      tries = triesBefore;
+      updateUI();
+      saveGameData();
+
+      // Reset Ammo transform
+      const trans = new Ammo.btTransform();
+      trans.setIdentity();
+      trans.setOrigin(new Ammo.btVector3(position.x, position.y, position.z));
+      ballBody.setWorldTransform(trans);
+      ballBody.getMotionState()?.setWorldTransform(trans);
+
+      // Restore velocity
+      const vel = new Ammo.btVector3(velocity.x, velocity.y, velocity.z);
+      ballBody.setLinearVelocity(vel);
+      ballBody.setAngularVelocity(new Ammo.btVector3(0, 0, 0));
+
+      ballBody.activate(true);
+
+      // Update mesh
+      ballMesh.position.copy(position);
+
+      console.log("Ball undo");
     },
   };
 }
