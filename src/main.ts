@@ -407,7 +407,7 @@ function bindInput() {
   addEventListener("keydown", (e) => {
     // ----- Language switching (always allowed) -----
 
-    if (e.code === "KeyU") undo();
+    if (e.code === "KeyU" && !world1Complete) undo();
     if (e.code === "Digit4") saveGameData();
     if (e.code === "Digit5") resetGame();
     if (e.code === "Digit6") setLanguage("en");
