@@ -197,7 +197,7 @@ function setLights(ambientIntensity: number, sunIntensity: number) {
 }
 
 function updateWorldMaterials(dark: boolean) {
-  scene.traverse((obj) => {
+  scene.traverse((obj: THREE.Object3D) => {
     if ((obj as THREE.Mesh).isMesh) {
       const mesh = obj as THREE.Mesh;
       const mat = mesh.material as THREE.MeshStandardMaterial;
@@ -1347,62 +1347,3 @@ function undo() {
     action.undo();
   }
 }
-
-// Clear scene and physics for world switch
-function clearScene() {
-  while (scene.children.length > 0) {
-    const obj = scene.children.pop();
-    if (obj) {
-      scene.remove(obj);
-    }
-  }
-}
-
-// Clear physics bodies
-function clearPhysics() {
-  if (!physicsWorld) {
-    return;
-  }
-
-  for (let i = bodies.length - 1; i >= 0; i--) {
-    const { body } = bodies[i];
-/* Tutorial Level (Unused)
-// Walls
-  const restitution = 1.1;
-
-  createBox(
-    { width: 1, height: 2, depth: 32 },
-    { x: 4.5, z: 0 },
-    scene,
-    physicsWorld,
-    0.5,
-    restitution,
-  );
-
-  createBox(
-    { width: 1, height: 2, depth: 32 },
-    { x: -4.5, z: 0 },
-    scene,
-    physicsWorld,
-    0.5,
-    restitution,
-  );
-
-  createBox(
-    { width: 10, height: 2, depth: 1 },
-    { x: 0, z: -16.5 },
-    scene,
-    physicsWorld,
-    0.5,
-    restitution,
-  );
-
-  createBox(
-    { width: 10, height: 2, depth: 1 },
-    { x: 0, z: 16.5 },
-    scene,
-    physicsWorld,
-    0.5,
-    restitution,
-  );
-*/
