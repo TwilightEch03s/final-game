@@ -26,6 +26,9 @@ interface AmmoRigidBody {
   setFriction(friction: number): void;
   setRollingFriction(friction: number): void;
   setDamping(linear: number, angular: number): void;
+  setWorldTransform(transform: AmmoTransform): void;
+  setLinearVelocity(velocity: unknown): void;
+  setAngularVelocity(velocity: unknown): void;
 }
 
 interface AmmoWorld {
@@ -52,6 +55,8 @@ const bodies: { body: AmmoRigidBody; mesh: THREE.Mesh }[] = [];
 
 let ballBody: AmmoRigidBody;
 let ballMesh: THREE.Mesh;
+// deno-lint-ignore prefer-const
+let ballPreviousPosition: THREE.Vector3 = new THREE.Vector3(0, 2, 14);
 
 let player: THREE.Mesh;
 
@@ -745,6 +750,9 @@ function shoot() {
     return;
   }
 
+  // Save current position before shooting
+  ballPreviousPosition.copy(ballMesh.position);
+
   charging = false;
   overcharged = power >= OVERPOWER;
   powerLocked = true;
@@ -832,7 +840,10 @@ function animate() {
     }
   }
 
-  if (ballMesh && !gameEnded) checkWin();
+  if (ballMesh && !gameEnded) {
+    checkWin();
+    checkBallFallOff();
+  }
 
   updateItems();
 
@@ -851,40 +862,132 @@ function checkWin() {
   }
 }
 
+// Check if ball fell off the map
+function checkBallFallOff() {
+  const FALL_HEIGHT = -10; // Height threshold for falling off
+
+  if (ballMesh.position.y < FALL_HEIGHT) {
+    // Reset ball to previous position
+    ballMesh.position.copy(ballPreviousPosition);
+
+    // Reset physics body transform
+    const transform = new Ammo.btTransform();
+    transform.setIdentity();
+    transform.setOrigin(
+      new Ammo.btVector3(
+        ballPreviousPosition.x,
+        ballPreviousPosition.y,
+        ballPreviousPosition.z,
+      ),
+    );
+    ballBody.setWorldTransform(transform);
+
+    // Stop all velocity
+    ballBody.setLinearVelocity(new Ammo.btVector3(0, 0, 0));
+    ballBody.setAngularVelocity(new Ammo.btVector3(0, 0, 0));
+    ballBody.activate(true);
+
+    // Deduct a turn
+    tries--;
+    updateUI();
+
+    // Check for game over
+    if (tries <= 0 && !gameEnded) {
+      gameEnded = true;
+      setTimeout(() => {
+        explodeBomb();
+      }, 500);
+    }
+  }
+}
+
 // Explosion effect
 function explodeBomb() {
   if (!ballMesh) return;
 
-  // Create explosion particles
-  const particleCount = 50;
-  const particles: THREE.Mesh[] = [];
+  const explosionCenter = ballMesh.position.clone();
 
+  // Create massive explosion particles
+  const particleCount = 200;
+  const particles: THREE.Mesh[] = [];
+  const debrisParticles: THREE.Mesh[] = [];
+
+  // Main explosion particles (fire and smoke)
   for (let i = 0; i < particleCount; i++) {
-    const size = Math.random() * 0.5 + 0.2;
+    const size = Math.random() * 1.5 + 0.3;
     const geo = new THREE.SphereGeometry(size, 8, 8);
+    const isSmoke = Math.random() > 0.6;
     const mat = new THREE.MeshStandardMaterial({
-      color: Math.random() > 0.5 ? 0xff4500 : 0xff8c00,
-      emissive: 0xff4500,
-      emissiveIntensity: 0.8,
+      color: isSmoke ? 0x333333 : (Math.random() > 0.5 ? 0xff4500 : 0xff8c00),
+      emissive: isSmoke ? 0x000000 : 0xff4500,
+      emissiveIntensity: isSmoke ? 0 : 1.5,
     });
     const particle = new THREE.Mesh(geo, mat);
 
-    particle.position.copy(ballMesh.position);
+    particle.position.copy(explosionCenter);
 
-    // Random velocity
+    // Random velocity with higher speeds
     const angle = Math.random() * Math.PI * 2;
     const elevation = Math.random() * Math.PI - Math.PI / 2;
-    const speed = Math.random() * 15 + 5;
+    const speed = Math.random() * 30 + 10;
 
     particle.userData.velocity = new THREE.Vector3(
       Math.cos(angle) * Math.cos(elevation) * speed,
-      Math.sin(elevation) * speed + 10,
+      Math.sin(elevation) * speed + 15,
       Math.sin(angle) * Math.cos(elevation) * speed,
     );
+    particle.userData.isSmoke = isSmoke;
 
     scene.add(particle);
     particles.push(particle);
   }
+
+  // Destroy map pieces (debris)
+  const mapObjects: THREE.Mesh[] = [];
+  scene.traverse((obj) => {
+    if ((obj as THREE.Mesh).isMesh && obj !== ballMesh) {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.geometry && mesh.material) {
+        mapObjects.push(mesh);
+      }
+    }
+  });
+
+  // Create debris from map destruction
+  mapObjects.forEach((obj) => {
+    const distance = obj.position.distanceTo(explosionCenter);
+    if (distance < 100) { // Everything gets destroyed
+      const debrisSize = Math.random() * 2 + 0.5;
+      const geo = new THREE.BoxGeometry(debrisSize, debrisSize, debrisSize);
+      const mat = (obj.material as THREE.MeshStandardMaterial).clone();
+      mat.emissive = new THREE.Color(0xff4500);
+      mat.emissiveIntensity = 0.5;
+
+      const debris = new THREE.Mesh(geo, mat);
+      debris.position.copy(obj.position);
+
+      // Blast away from explosion center
+      const blastDir = obj.position.clone().sub(explosionCenter).normalize();
+      const blastForce = (100 - distance) * 0.5;
+
+      debris.userData.velocity = new THREE.Vector3(
+        blastDir.x * blastForce + (Math.random() - 0.5) * 20,
+        Math.random() * 25 + 20,
+        blastDir.z * blastForce + (Math.random() - 0.5) * 20,
+      );
+      debris.userData.rotationSpeed = new THREE.Vector3(
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10,
+      );
+
+      scene.add(debris);
+      debrisParticles.push(debris);
+
+      // Hide original object
+      obj.visible = false;
+    }
+  });
 
   // Hide the bomb
   ballMesh.visible = false;
@@ -893,11 +996,47 @@ function explodeBomb() {
   const originalBg = scene.background;
   scene.background = new THREE.Color(0xffffff);
 
-  // Animate particles
+  // Create shockwave ring
+  const ringGeo = new THREE.RingGeometry(0.1, 1, 32);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0xff4500,
+    transparent: true,
+    opacity: 1,
+    side: THREE.DoubleSide,
+  });
+  const shockwave = new THREE.Mesh(ringGeo, ringMat);
+  shockwave.position.copy(explosionCenter);
+  shockwave.rotation.x = -Math.PI / 2;
+  scene.add(shockwave);
+
+  // Camera shake and animation
+  const originalCameraPos = camera.position.clone();
   let time = 0;
+  let shockwaveScale = 1;
+
   const explosionInterval = setInterval(() => {
     time += 0.016;
 
+    // Screen shake
+    if (time < 1) {
+      const shakeIntensity = Math.max(0, 1 - time) * 2;
+      camera.position.set(
+        originalCameraPos.x + (Math.random() - 0.5) * shakeIntensity,
+        originalCameraPos.y + (Math.random() - 0.5) * shakeIntensity,
+        originalCameraPos.z + (Math.random() - 0.5) * shakeIntensity,
+      );
+    } else {
+      camera.position.copy(originalCameraPos);
+    }
+
+    // Shockwave expansion
+    if (shockwaveScale < 100) {
+      shockwaveScale += 3;
+      shockwave.scale.set(shockwaveScale, shockwaveScale, 1);
+      ringMat.opacity = Math.max(0, 1 - shockwaveScale / 100);
+    }
+
+    // Animate explosion particles
     particles.forEach((particle) => {
       particle.position.add(
         particle.userData.velocity.clone().multiplyScalar(0.016),
@@ -906,23 +1045,46 @@ function explodeBomb() {
 
       // Fade out
       const mat = particle.material as THREE.MeshStandardMaterial;
-      mat.opacity = Math.max(0, 1 - time * 2);
+      if (particle.userData.isSmoke) {
+        mat.opacity = Math.max(0, 1 - time * 0.5); // Smoke lingers
+        particle.scale.multiplyScalar(1.02); // Smoke expands
+      } else {
+        mat.opacity = Math.max(0, 1 - time * 1.5);
+        particle.scale.multiplyScalar(0.97);
+      }
       mat.transparent = true;
-
-      // Shrink
-      particle.scale.multiplyScalar(0.98);
     });
 
-    if (time > 0.1) {
+    // Animate debris
+    debrisParticles.forEach((debris) => {
+      debris.position.add(
+        debris.userData.velocity.clone().multiplyScalar(0.016),
+      );
+      debris.userData.velocity.y -= 40 * 0.016; // Gravity
+
+      // Rotate debris
+      debris.rotation.x += debris.userData.rotationSpeed.x * 0.016;
+      debris.rotation.y += debris.userData.rotationSpeed.y * 0.016;
+      debris.rotation.z += debris.userData.rotationSpeed.z * 0.016;
+
+      // Fade out
+      const mat = debris.material as THREE.MeshStandardMaterial;
+      mat.opacity = Math.max(0, 1 - time * 0.8);
+      mat.transparent = true;
+    });
+
+    if (time > 0.15) {
       scene.background = originalBg;
     }
 
-    if (time > 1) {
+    if (time > 3) {
       clearInterval(explosionInterval);
       particles.forEach((p) => scene.remove(p));
+      debrisParticles.forEach((d) => scene.remove(d));
+      scene.remove(shockwave);
 
       setTimeout(() => {
-        alert("💣💥");
+        alert("💀");
         location.reload();
       }, 500);
     }
