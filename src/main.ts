@@ -94,10 +94,13 @@ let currentLang: Lang = "en";
 const i18n = {
   en: {
     tries: "Tries",
-    instructions: "",
+    instructions: `Use WASD to move. Use E to interact with blocks.
+In golf mode, hold SPACE to power up your hit and move the camera to aim.
+Press '4' to save the game and '5' to reset.
+Press '6' for English, '7' for Chinese, '8' for Arabic.`,
     mode: "Mode",
     weak: "WEAK",
-    normal: "",
+    normal: "NORMAL",
     strong: "STRONG",
     interact: "Press E to interact",
     win: "🎉 You Win!",
@@ -106,10 +109,13 @@ const i18n = {
 
   zh: {
     tries: "次数",
-    instructions: "",
+    instructions: `使用 WASD 移动，按 E 与物体互动。
+在高尔夫模式中，按住 空格 键 蓄力并转动镜头瞄准。
+按 4 保存游戏，按 5 重置游戏。
+按 6 为英语，7 为中文，8 为阿拉伯语。`,
     mode: "模式",
     weak: "弱",
-    normal: "",
+    normal: "正常",
     strong: "强",
     interact: "按 E 键互动",
     win: "🎉 你赢了！",
@@ -118,10 +124,13 @@ const i18n = {
 
   ar: {
     tries: "المحاولات",
-    instructions: "",
+    instructions: `استخدم WASD للحركة واضغط E للتفاعل.
+في وضع الجولف اضغط مطولاً على المسافة واضبط الكاميرا للتصويب.
+اضغط 4 للحفظ و5 لإعادة التعيين.
+اضغط 6 للإنجليزية و7 للصينية و8 للعربية.`,
     mode: "الوضع",
     weak: "ضعيف",
-    normal: "",
+    normal: "عادي",
     strong: "قوي",
     interact: "اضغط E للتفاعل",
     win: "🎉 فزت!",
@@ -136,6 +145,12 @@ function t(key: keyof typeof i18n["en"]): string {
 function setLanguage(lang: Lang) {
   currentLang = lang;
   interactPrompt.textContent = t("interact");
+
+  const instructionEl = document.getElementById("instructions");
+  if (instructionEl) instructionEl.innerText = t("instructions");
+
+  modeText.textContent = `${t("mode")}: ${t("normal")}`;
+
   updateUI();
   applyLanguageLayout(lang);
 }
@@ -353,10 +368,8 @@ function initUI() {
   instructionEl.style.left = "20px";
   instructionEl.style.color = "white";
   instructionEl.style.fontSize = "20px";
-  instructionEl.innerText = `Use WASD to move.  Use E to interact with blocks.\n
-  In golf mode, hold space to power up your hit and \nmove the camera to aim!\n
-  Press '4' to save the game and '5' to reset!\n
-  Press '6' for English, Press '7' for Chinese, Press '8' for Arabic.`;
+  instructionEl.id = "instructions";
+  instructionEl.innerText = t("instructions");
   document.body.appendChild(instructionEl);
 
   const modeEl = document.createElement("div");
@@ -398,7 +411,7 @@ function initUI() {
 function updateUI() {
   powerFill.style.height = `${(power / POWER_MAX) * 100}%`;
   triesText.textContent = `${t("tries")}: ${tries}`;
-  modeText.textContent ||= `${t("mode")}: NORMAL`;
+  modeText.textContent ||= `${t("mode")}: ${t("normal")}`;
 }
 
 // Input binding
@@ -433,13 +446,13 @@ function bindInput() {
     }
 
     if (k === "Digit2") {
-      powerMultiplier = STRONG;
-      modeText.textContent = `${t("mode")}: ${t("strong")}`;
+      powerMultiplier = NORMAL;
+      modeText.textContent = `${t("mode")}: ${t("normal")}`;
     }
 
     if (k === "Digit3") {
-      powerMultiplier = NORMAL;
-      modeText.textContent = `${t("mode")}: ${t("normal")}`;
+      powerMultiplier = STRONG;
+      modeText.textContent = `${t("mode")}: ${t("strong")}`;
     }
   });
 
