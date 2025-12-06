@@ -77,6 +77,7 @@ let overcharged = false;
 
 let powerMultiplier = 1.0;
 const WEAK = 0.6;
+const NORMAL = 1.0;
 const STRONG = 1.6;
 
 // UI
@@ -93,8 +94,10 @@ let currentLang: Lang = "en";
 const i18n = {
   en: {
     tries: "Tries",
+    instructions: "",
     mode: "Mode",
     weak: "WEAK",
+    normal: "",
     strong: "STRONG",
     interact: "Press E to interact",
     win: "🎉 You Win!",
@@ -103,8 +106,10 @@ const i18n = {
 
   zh: {
     tries: "次数",
+    instructions: "",
     mode: "模式",
     weak: "弱",
+    normal: "",
     strong: "强",
     interact: "按 E 键互动",
     win: "🎉 你赢了！",
@@ -113,8 +118,10 @@ const i18n = {
 
   ar: {
     tries: "المحاولات",
+    instructions: "",
     mode: "الوضع",
     weak: "ضعيف",
+    normal: "",
     strong: "قوي",
     interact: "اضغط E للتفاعل",
     win: "🎉 فزت!",
@@ -348,7 +355,8 @@ function initUI() {
   instructionEl.style.fontSize = "20px";
   instructionEl.innerText = `Use WASD to move.  Use E to interact with blocks.\n
   In golf mode, hold space to power up your hit and \nmove the camera to aim!\n
-  Press '5' to save the game and '6' to reset!`;
+  Press '4' to save the game and '5' to reset!\n
+  Press '6' for English, Press '7' for Chinese, Press '8' for Arabic.`;
   document.body.appendChild(instructionEl);
 
   const modeEl = document.createElement("div");
@@ -400,11 +408,11 @@ function bindInput() {
     // ----- Language switching (always allowed) -----
 
     if (e.code === "KeyU") undo();
-    if (e.code === "Digit5") saveGameData();
-    if (e.code === "Digit6") resetGame();
-    if (e.code === "Digit7") setLanguage("en");
-    if (e.code === "Digit8") setLanguage("zh");
-    if (e.code === "Digit9") setLanguage("ar");
+    if (e.code === "Digit4") saveGameData();
+    if (e.code === "Digit5") resetGame();
+    if (e.code === "Digit6") setLanguage("en");
+    if (e.code === "Digit7") setLanguage("zh");
+    if (e.code === "Digit8") setLanguage("ar");
 
     const k = e.code;
 
@@ -427,6 +435,11 @@ function bindInput() {
     if (k === "Digit2") {
       powerMultiplier = STRONG;
       modeText.textContent = `${t("mode")}: ${t("strong")}`;
+    }
+
+    if (k === "Digit3") {
+      powerMultiplier = NORMAL;
+      modeText.textContent = `${t("mode")}: ${t("normal")}`;
     }
   });
 
