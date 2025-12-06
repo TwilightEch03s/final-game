@@ -399,6 +399,7 @@ function bindInput() {
   addEventListener("keydown", (e) => {
     // ----- Language switching (always allowed) -----
 
+    if (e.code === "KeyU") undo();
     if (e.code === "Digit5") saveGameData();
     if (e.code === "Digit6") resetGame();
     if (e.code === "Digit7") setLanguage("en");
@@ -504,6 +505,15 @@ function createItem(
       return;
     }
   }
+  for (const item of items) {
+    if (
+      item.position.x == pos.x && item.position.z == pos.z && !item.pickedUp
+    ) {
+      scene.add(item.mesh);
+      return;
+    }
+  }
+
   const geo = new THREE.BoxGeometry(size, size, size);
   const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
   const mesh = new THREE.Mesh(geo, mat);
@@ -533,7 +543,6 @@ function createItem(
   };
 
   items.push(item);
-
   return item;
 }
 
@@ -639,6 +648,8 @@ function pickupItem(item: Item) {
   tries++;
   updateUI();
 
+  undoStack.push(itemAction(item));
+
   console.log(
     "Item picked up:",
     item.name,
@@ -658,6 +669,7 @@ function checkStartWorld1Trigger() {
   const dz = player.position.z - WORLD1_TRIGGER.z;
 
   if (dx * dx + dz * dz < WORLD1_TRIGGER.size * WORLD1_TRIGGER.size) {
+    undoStack.push(enterRoomAction());
     world0Complete = true;
     saveGameData();
     clearScene();
@@ -668,6 +680,7 @@ function checkStartWorld1Trigger() {
 
 // Start World 2
 const WORLD2_TRIGGER = { x: 0, z: -15, size: 5 };
+let triggered = false;
 function checkStartWorld2Trigger() {
   if (world1Complete) {
     return;
@@ -677,9 +690,12 @@ function checkStartWorld2Trigger() {
   const dz = player.position.z - WORLD2_TRIGGER.z;
 
   if (dx * dx + dz * dz < WORLD2_TRIGGER.size * WORLD2_TRIGGER.size) {
-    if (inventory === 0) {
+    if (inventory === 0 && !triggered) {
       alert(t("lose"));
       location.reload();
+      triggered = true;
+    } else if (triggered) {
+      resetGame();
     } else {
       startWorld2();
     }
@@ -1072,6 +1088,57 @@ function _createWorld2() {
   ballBody.setFriction(2.5);
   ballBody.setRollingFriction(1.2);
   ballBody.setDamping(0.6, 0.9);
+}
+
+// Undo system
+interface UndoAction {
+  undo: () => void;
+}
+
+const undoStack: UndoAction[] = [];
+
+function itemAction(item: Item): UndoAction {
+  return {
+    undo: () => {
+      const index = pickedItems.indexOf(item);
+      if (index !== -1) {
+        pickedItems.splice(index, 1);
+      }
+
+      createItem(
+        {
+          x: item.position.x,
+          y: item.position.y,
+          z: item.position.z,
+        },
+        1,
+        true,
+      );
+      inventory--;
+      tries--;
+      updateUI();
+      saveGameData();
+    },
+  };
+}
+
+function enterRoomAction(): UndoAction {
+  return {
+    undo: () => {
+      world0Complete = false;
+      saveGameData();
+      clearScene();
+      clearPhysics();
+      _createWorld0();
+    },
+  };
+}
+
+function undo() {
+  const action = undoStack.pop();
+  if (action) {
+    action.undo();
+  }
 }
 
 // Clear scene and physics for world switch
