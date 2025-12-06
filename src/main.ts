@@ -56,10 +56,10 @@ let ballMesh: THREE.Mesh;
 let player: THREE.Mesh;
 
 // Game state
-let world1Started = false;
-let world2Started = false;
+let world0Complete: boolean = false;
+let world1Complete: boolean = false;
 let gameEnded = false;
-let tries = 0;
+let tries: number = 0;
 let inventory = 0;
 
 // Constants
@@ -224,10 +224,52 @@ function start() {
   applyTheme(isDarkMode);
   initScene();
   initPhysics();
+  loadGameData();
   initUI();
-  _createWorld0();
+  loadWorld();
   bindInput();
   animate();
+}
+
+function saveGameData() {
+  localStorage.world0 = world0Complete;
+  localStorage.world1 = world1Complete;
+  localStorage.tries = tries;
+  localStorage.inventory = inventory;
+  localStorage.pickedItems = JSON.stringify(pickedItems);
+
+  console.log(JSON.parse(localStorage.pickedItems));
+
+  console.log(localStorage);
+}
+
+function resetGame() {
+  localStorage.clear();
+  location.reload();
+}
+
+function loadGameData() {
+  if (localStorage.length == 0) return;
+  world0Complete = JSON.parse(localStorage.world0);
+  world1Complete = JSON.parse(localStorage.world1);
+  tries = localStorage.tries;
+  inventory = localStorage.inventory;
+  pickedItems = JSON.parse(localStorage.pickedItems);
+
+  console.log(localStorage);
+}
+
+function loadWorld() {
+  if ((world0Complete && world1Complete) == true) {
+    startWorld2();
+    return;
+  }
+  if (world0Complete) {
+    _createWorld1();
+  }
+  if (!world0Complete && !world1Complete) {
+    _createWorld0();
+  }
 }
 
 // Scene initalization
@@ -298,6 +340,17 @@ function initUI() {
   triesEl.style.fontSize = "20px";
   document.body.appendChild(triesEl);
 
+  const instructionEl = document.createElement("div");
+  instructionEl.style.position = "fixed";
+  instructionEl.style.top = "20px";
+  instructionEl.style.left = "20px";
+  instructionEl.style.color = "white";
+  instructionEl.style.fontSize = "20px";
+  instructionEl.innerText = `Use WASD to move.  Use E to interact with blocks.\n
+  In golf mode, hold space to power up your hit and \nmove the camera to aim!\n
+  Press '5' to save the game and '6' to reset!`;
+  document.body.appendChild(instructionEl);
+
   const modeEl = document.createElement("div");
   modeEl.style.position = "fixed";
   modeEl.style.bottom = "20px";
@@ -345,6 +398,9 @@ function bindInput() {
   // Key DOWN
   addEventListener("keydown", (e) => {
     // ----- Language switching (always allowed) -----
+
+    if (e.code === "Digit5") saveGameData();
+    if (e.code === "Digit6") resetGame();
     if (e.code === "Digit7") setLanguage("en");
     if (e.code === "Digit8") setLanguage("zh");
     if (e.code === "Digit9") setLanguage("ar");
@@ -355,7 +411,7 @@ function bindInput() {
     keys[k] = true;
 
     // ----- Do NOT block language switching -----
-    if (!world1Started) return;
+    if (!world0Complete) return;
 
     // ----- Gameplay controls -----
     if (k === "Space" && canShoot()) {
@@ -377,7 +433,7 @@ function bindInput() {
   addEventListener("keyup", (e) => {
     keys[e.code] = false;
 
-    if (!world2Started) return;
+    if (!world1Complete) return;
 
     if (e.code === "Space") {
       shoot();
@@ -387,7 +443,8 @@ function bindInput() {
 
 // Player movement
 function updatePlayerMovement() {
-  if (!player || world2Started) {
+  if (!player || world1Complete) {
+    console.log("???");
     return;
   }
 
@@ -434,6 +491,7 @@ interface Item {
 }
 
 const items: Item[] = [];
+let pickedItems: Item[] = [];
 
 // Item functions
 function createItem(
@@ -441,6 +499,11 @@ function createItem(
   size = 1,
   isPhysical = false,
 ) {
+  for (const item of pickedItems) {
+    if (item.position.x == pos.x) {
+      return;
+    }
+  }
   const geo = new THREE.BoxGeometry(size, size, size);
   const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
   const mesh = new THREE.Mesh(geo, mat);
@@ -548,6 +611,7 @@ function updateItems() {
 }
 
 function pickupItem(item: Item) {
+  pickedItems.push(item);
   item.pickedUp = true;
   item.interactable = false;
 
@@ -588,13 +652,14 @@ function pickupItem(item: Item) {
 // Start World 1
 const WORLD1_TRIGGER = { x: 0, z: -15, size: 5 };
 function checkStartWorld1Trigger() {
-  if (world1Started) return;
+  if (world0Complete) return;
 
   const dx = player.position.x - WORLD1_TRIGGER.x;
   const dz = player.position.z - WORLD1_TRIGGER.z;
 
   if (dx * dx + dz * dz < WORLD1_TRIGGER.size * WORLD1_TRIGGER.size) {
-    world1Started = true;
+    world0Complete = true;
+    saveGameData();
     clearScene();
     clearPhysics();
     _createWorld1();
@@ -604,7 +669,7 @@ function checkStartWorld1Trigger() {
 // Start World 2
 const WORLD2_TRIGGER = { x: 0, z: -15, size: 5 };
 function checkStartWorld2Trigger() {
-  if (world2Started) {
+  if (world1Complete) {
     return;
   }
 
@@ -683,7 +748,7 @@ function animate() {
     }
   });
 
-  if (!world2Started) {
+  if (!world1Complete) {
     updatePlayerMovement();
   }
 
@@ -924,7 +989,8 @@ function _createWorld1() {
 
 // World 2: Golf Game
 function startWorld2() {
-  world2Started = true;
+  world1Complete = true;
+  saveGameData();
   clearScene();
   clearPhysics();
   addDefaultLights();
