@@ -70,3 +70,23 @@ Our team's plan for the game has changed quite significantly through the week. W
 ## F2 Reflection
 
 Our team's plan for the game hasn't really changed between F1 and F2. The goal of our game was to create a golf mini-game and the F2 requirements just built onto that. We didn't have anything set in mind for gameplay outside of just golfing so the requirements for F2 gave us some direction as to what to do in terms of that.
+
+## Devlog Entry - 12/5/2025
+
+## Selected requirements
+
+1. [save system] - We decided to implement a save system because it was something that we already learned in a previous assignment.
+2. [unlimited undo] - We decided to implemented unlimited undos in our game because it worked together with the save system. It was also something that we learned in a previous assignment and we thought that it would be a good idea to implement what we already learned.
+3. [visual themes] - We decided to implement visual themes because we thought that it would be one of the easier requirements to fufill without changing any game systems of our game.
+4. [i18n + l10n] - Just like visual themes, we decided to implement multi-language support because we thought that it would be one of the requirements to fufill without changing any game systems of our game.
+
+## How we satisfied the F3 software requirements
+
+1. Our game incorporates a save system, where players can manually save the game. The game also has an auto-save mechanic that saves the game when the player enters a new room.
+2. Our game incorporates an undo system. So if the player needs to go back or wants to undo a task, the player can undo it and redo it. The player is able to undo picking up items and going back rooms, but cannot undo anything in the physics based golf level.
+3. Our game implements visual themes to support light and dark modes that changes based on the users computer operating system settings. If the user is on light mode, the game is white and has bright colors and if the user is on dark mode, the game is black.
+4. Our game supports i18n + l10n, three different languages that can be changed using different num keys. These languages can be switched between English, Chinese, and Arabic by pressing '6', '7', and '8' respectively.
+
+## F3 Reflection
+
+Our team's plan for the game hasn't really changed between F2 and F3. Our goal was to add quality of life changes to our game and add in variety to our game. We did this by implementing the software requirements for F3 and by also having a better level to showcase our game mechanics. However, one thing that we weren't able to accomplish was creating our own 3D assets for the game.
