@@ -543,10 +543,10 @@ function createItem(
   isPhysical = false,
 ) {
   for (const item of pickedItems) {
-    if (item.position.x == pos.x) {
-      return;
-    }
+    if (!item || !item.position) continue;
+    if (item.position.x === pos.x && item.position.z === pos.z) return;
   }
+
   for (const item of items) {
     if (
       item.position.x == pos.x && item.position.z == pos.z && !item.pickedUp
@@ -722,22 +722,17 @@ function checkStartWorld1Trigger() {
 
 // Start World 2
 const WORLD2_TRIGGER = { x: 0, z: -15, size: 5 };
-let triggered = false;
+
 function checkStartWorld2Trigger() {
-  if (world1Complete) {
-    return;
-  }
+  if (world1Complete) return;
 
   const dx = player.position.x - WORLD2_TRIGGER.x;
   const dz = player.position.z - WORLD2_TRIGGER.z;
 
   if (dx * dx + dz * dz < WORLD2_TRIGGER.size * WORLD2_TRIGGER.size) {
-    if (inventory === 0 && !triggered) {
+    if (inventory === 0) {
       alert(t("lose"));
       location.reload();
-      triggered = true;
-    } else if (triggered) {
-      resetGame();
     } else {
       startWorld2();
     }
@@ -834,7 +829,7 @@ function animate() {
     }
   }
 
-  if (!world1Complete) {
+  if (!gameEnded) {
     updatePlayerMovement();
   }
 
@@ -1342,19 +1337,39 @@ function _createWorld1() {
 
 // World 2: Golf Game
 function startWorld2() {
+  // Save state BEFORE entering golf so undo can return cleanly
+  const inventoryBefore = inventory;
+  const triesBefore = tries;
+  const pickedBefore = pickedItems
+    .filter((i) => i && i.position)
+    .map((item) => ({
+      x: item.position.x,
+      y: item.position.y,
+      z: item.position.z,
+      name: item.name,
+    }));
+
+  // Push undo action for world transition
+  undoStack.push(enterGolfAction(inventoryBefore, triesBefore, pickedBefore));
+
+  // Mark golf world as entered
   world1Complete = true;
   saveGameData();
+
+  // Clear old world
   clearScene();
   clearPhysics();
   addDefaultLights();
-  // scene.background = new THREE.Color(0x1a1a1a);
-  // scene.fog = new THREE.Fog(0x1a1a1a, 50, 100);
 
+  // Enable golf UI
   powerFill.style.display = "block";
   triesText.style.display = "block";
   modeText.style.display = "block";
 
+  // Load golf scene
   _createWorld2();
+
+  // Update UI + theme
   updateUI();
   applyTheme(isDarkMode);
 }
@@ -1639,19 +1654,22 @@ function itemAction(item: Item): UndoAction {
         pickedItems.splice(index, 1);
       }
 
-      createItem(
-        {
-          x: item.position.x,
-          y: item.position.y,
-          z: item.position.z,
-        },
-        1,
-        true,
-      );
-      inventory--;
-      tries--;
-      updateUI();
-      saveGameData();
+      if (!world1Complete) {
+        createItem(
+          {
+            x: item.position.x,
+            y: item.position.y,
+            z: item.position.z,
+          },
+          1,
+          true,
+        );
+
+        inventory--;
+        tries--;
+        updateUI();
+        saveGameData();
+      }
     },
   };
 }
@@ -1691,6 +1709,52 @@ function ballShotAction(
     },
   };
 }
+
+function enterGolfAction(
+  inventoryBefore: number,
+  triesBefore: number,
+  pickedBefore: ItemSnapshot[],
+): UndoAction {
+  return {
+    undo: () => {
+      // Reset world state correctly
+      gameEnded = false;
+      world1Complete = false;
+      world0Complete = true;
+
+      // Restore inventory and tries
+      inventory = inventoryBefore;
+      tries = triesBefore;
+
+      // Restore picked items safely (no physics, no meshes)
+      pickedItems = pickedBefore.map((p) => ({
+        name: p.name,
+        position: new THREE.Vector3(p.x, p.y, p.z),
+        mesh: undefined as unknown as THREE.Mesh,
+        body: undefined,
+        interactable: true,
+        pickedUp: true,
+      }));
+
+      saveGameData();
+
+      // Reload World 1 cleanly
+      clearScene();
+      clearPhysics();
+      _createWorld1();
+
+      updateUI();
+      console.log("Undo golf entry → returned to World 1");
+    },
+  };
+}
+
+type ItemSnapshot = {
+  x: number;
+  y: number;
+  z: number;
+  name: string;
+};
 
 function enterRoomAction(): UndoAction {
   return {
